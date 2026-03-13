@@ -1,4 +1,4 @@
-name: ClassChat Server
+name: ClassChat Quick
 on: [push, workflow_dispatch]
 
 jobs:
