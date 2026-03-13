@@ -1,0 +1,43 @@
+name: ClassChat Server
+on: [push, workflow_dispatch]
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1 & 2: Clone and Enter Directory
+      - name: Checkout ClassChat
+        uses: actions/checkout@v4
+        with:
+          repository: 'emoticonyt/classchatnode'
+
+      # Setup Node environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Step 3: Unzip Folders.zip
+      - name: Unzip Project Assets
+        run: unzip FOlders.zip
+
+      # Step 4: Install Dependencies
+      - name: Install NPM Modules
+        run: npm install
+
+      # Setup Cloudflare for access
+      - name: Install cloudflared
+        uses: AnimMouse/setup-cloudflared@v2
+
+      # Step 5: Start Server and Tunnel
+      - name: Run Server and Expose Port
+        run: |
+          # Start the server in the background
+          node server.js & 
+          
+          # Start the tunnel (Quick Tunnel)
+          # Note: Replace 3000 with the port mentioned in your console output
+          cloudflared tunnel --url http://localhost:3000 &
+          
+          # Keep the runner alive for 1 hour to use the app
+          sleep 3600
