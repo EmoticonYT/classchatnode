@@ -35,9 +35,7 @@ jobs:
           # Start the server in the background
           node server.js & 
           
-          # Start the tunnel (Quick Tunnel)
-          # Note: Replace 3000 with the port mentioned in your console output
-          cloudflared tunnel --url http://localhost:3000 &
+          cloudflared tunnel --url http://localhost:5000 &
           
           # Keep the runner alive for 1 hour to use the app
           sleep 3600
