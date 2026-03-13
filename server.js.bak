@@ -1,0 +1,714 @@
+/**
+ * ClassChat — Account system, posting, and image support.
+ * Yorkville CUSD 115 / Yorkville Intermediate School.
+ */
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const https = require('https');
+const express = require('express');
+const session = require('express-session');
+const FileStore = require('session-file-store')(session);
+const expressLayouts = require('express-ejs-layouts');
+const multer = require('multer');
+const bcrypt = require('bcryptjs');
+const db = require('./db');
+
+const app = express();
+const PORT = process.env.PORT || 80;
+
+const DISTRICT = 'Yorkville CUSD 115';
+const SCHOOL = 'Yorkville Intermediate School';
+const SUPPORT_USERNAME = 'CCSupport';
+
+const UPLOAD_DIR = path.join(__dirname, 'public', 'uploads');
+const AVATAR_DIR = path.join(__dirname, 'public', 'uploads', 'avatars');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+if (!fs.existsSync(AVATAR_DIR)) fs.mkdirSync(AVATAR_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const ext = (file.mimetype.match(/\/(jpeg|jpg|png|gif|webp)$/i) && file.originalname.split('.').pop()) || 'jpg';
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /^image\/(jpeg|jpg|png|gif|webp)$/i.test(file.mimetype);
+    cb(null, ok);
+  },
+});
+
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, AVATAR_DIR),
+  filename: (req, file, cb) => {
+    const ext = (file.mimetype.match(/\/(jpeg|jpg|png|gif|webp)$/i) && file.originalname.split('.').pop()) || 'jpg';
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`);
+  },
+});
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /^image\/(jpeg|jpg|png|gif|webp)$/i.test(file.mimetype);
+    cb(null, ok);
+  },
+});
+
+db.initDb();
+
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.use(expressLayouts);
+app.set('layout', 'layout');
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+const SESSION_DIR = path.join(__dirname, 'data', 'sessions');
+const MAINTENANCE_FLAG = path.join(__dirname, 'data', 'maintenance.flag');
+if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
+if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
+
+function getMaintenanceMode() {
+  try {
+    return fs.existsSync(MAINTENANCE_FLAG);
+  } catch (_) {
+    return false;
+  }
+}
+
+function setMaintenanceMode(on) {
+  try {
+    if (on) fs.writeFileSync(MAINTENANCE_FLAG, '1', 'utf8');
+    else if (fs.existsSync(MAINTENANCE_FLAG)) fs.unlinkSync(MAINTENANCE_FLAG);
+  } catch (_) {}
+}
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'classchat-dev-secret-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    store: new FileStore({
+      path: SESSION_DIR,
+      ttl: 30 * 24 * 60 * 60,
+      retries: 0,
+    }),
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax',
+    },
+  })
+);
+
+app.use((req, res, next) => {
+  res.locals.showSupportButton = !!req.session.userId;
+  res.locals.isGuest = !!req.session.guest;
+  if (req.session.userId) {
+    res.locals.pendingFriendRequestsCount = db.getPendingRequestsToMe(req.session.userId).length;
+    res.locals.unreadActivityCount = db.getUnreadNotificationCount(req.session.userId);
+  } else {
+    res.locals.pendingFriendRequestsCount = 0;
+    res.locals.unreadActivityCount = 0;
+  }
+  next();
+});
+
+app.use((req, res, next) => {
+  if (!getMaintenanceMode()) return next();
+  if (req.path.startsWith('/staff') || req.path === '/logout') return next();
+  res.status(503).render('maintenance', { title: 'Maintenance — ClassChat', layout: false });
+});
+
+function requireAuth(req, res, next) {
+  if (req.session.userId) return next();
+  res.redirect('/join?login=1');
+}
+
+function allowGuestOrAuth(req, res, next) {
+  if (req.session.userId || req.session.guest) return next();
+  res.redirect('/join?login=1');
+}
+
+function requireStaff(req, res, next) {
+  if (!req.session.userId) return res.redirect(getMaintenanceMode() ? '/staff/login' : '/?login=1');
+  const user = db.getUserById(req.session.userId);
+  if (!user || !user.is_staff) return res.redirect('/feed');
+  req.session.is_staff = true;
+  next();
+}
+
+app.get('/staff/login', (req, res) => {
+  if (getMaintenanceMode()) {
+    req.session.destroy(() => res.redirect('/maintenance-login.html'));
+    return;
+  }
+  if (req.session.userId) {
+    const user = db.getUserById(req.session.userId);
+    if (user && user.is_staff) return res.redirect('/staff/dashboard');
+  }
+  res.render('staff/login', {
+    title: 'Staff login — ClassChat',
+    layout: false,
+    district: DISTRICT,
+    school: SCHOOL,
+    error: req.query.error,
+  });
+});
+
+app.post('/staff/login', (req, res) => {
+  const username = (req.body.username || '').trim();
+  const password = req.body.password || '';
+  const user = db.getUserByUsername(username);
+  if (!user || !user.is_staff || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.redirect('/staff/login?error=invalid');
+  }
+  req.session.userId = user.id;
+  req.session.username = user.username;
+  req.session.school_id = user.school_id;
+  req.session.district = user.district;
+  req.session.school = user.school;
+  req.session.is_staff = true;
+  delete req.session.guest;
+  res.redirect('/staff/dashboard');
+});
+
+app.get('/', (req, res) => {
+  if (req.session.userId) return res.redirect('/feed');
+  res.render('landing', {
+    title: 'ClassChat',
+    district: DISTRICT,
+    school: SCHOOL,
+  });
+});
+
+app.get('/guest', (req, res) => {
+  if (req.session.userId) return res.redirect('/feed');
+  req.session.guest = true;
+  res.redirect('/feed');
+});
+
+app.get('/join', (req, res) => {
+  if (req.session.userId) return res.redirect('/feed');
+  res.render('index', {
+    title: 'Join — ClassChat',
+    district: DISTRICT,
+    school: SCHOOL,
+    loginError: req.query.login_error,
+    registerError: req.query.register_error,
+    showLogin: req.query.login === '1',
+  });
+});
+
+app.post('/register', (req, res) => {
+  const username = (req.body.username || '').trim().toLowerCase();
+  const password = req.body.password || '';
+  const schoolId = (req.body.school_id || '').trim();
+  const district = req.body.district || DISTRICT;
+  const school = req.body.school || SCHOOL;
+  if (!username || !password || !schoolId) {
+    return res.redirect('/join?register_error=missing');
+  }
+  if (username.length < 2) return res.redirect('/join?register_error=username_short');
+  if (password.length < 6) return res.redirect('/join?register_error=password_short');
+  if (db.getUserByUsername(username)) return res.redirect('/join?register_error=username_taken');
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const userId = db.createUser(username, passwordHash, schoolId, district, school, 0);
+  req.session.userId = userId;
+  req.session.username = username;
+  req.session.school_id = schoolId;
+  req.session.district = district;
+  req.session.school = school;
+  delete req.session.guest;
+  res.redirect('/feed');
+});
+
+app.post('/login', (req, res) => {
+  const username = (req.body.username || '').trim();
+  const password = req.body.password || '';
+  const user = db.getUserByUsername(username);
+  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.redirect('/join?login=1&login_error=invalid');
+  }
+  req.session.userId = user.id;
+  req.session.username = user.username;
+  req.session.school_id = user.school_id;
+  req.session.district = user.district;
+  req.session.school = user.school;
+  req.session.is_staff = user.is_staff ? true : false;
+  delete req.session.guest;
+  res.redirect(user.is_staff ? '/staff/dashboard' : '/feed');
+});
+
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/'));
+});
+
+function formatPostTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+}
+
+app.get('/feed', allowGuestOrAuth, (req, res) => {
+  const classId = req.query.class ? String(req.query.class).trim() : null;
+  const classes = db.getClasses();
+  const currentClass = classId && classes.find((c) => String(c.id) === classId) ? { id: classId, name: classes.find((c) => String(c.id) === classId).name } : null;
+  const raw = db.getPosts(100, currentClass ? currentClass.id : null);
+  const userId = req.session.userId || null;
+  const posts = raw.map((p) => ({
+    ...p,
+    created_at: formatPostTime(p.created_at),
+    likeCount: db.getLikeCount(p.id),
+    dislikeCount: db.getDislikeCount(p.id),
+    replyCount: db.getReplyCount(p.id),
+    userLiked: userId ? db.getUserLike(p.id, userId) : false,
+    userDisliked: userId ? db.getUserDislike(p.id, userId) : false,
+    userSaved: userId ? db.isPostSavedByUser(userId, p.id) : false,
+  }));
+  const currentUser = userId ? db.getUserById(userId) : null;
+  res.render('feed', {
+    title: currentClass ? `${currentClass.name} — ClassChat` : 'Feed — ClassChat',
+    district: req.session.district || DISTRICT,
+    school: req.session.school || SCHOOL,
+    school_id: req.session.school_id || null,
+    username: req.session.username || null,
+    userId,
+    display_name: currentUser?.display_name || null,
+    currentUser,
+    is_staff: !!req.session.is_staff,
+    isGuest: !!req.session.guest,
+    posts,
+    classes,
+    currentClass,
+    postError: req.query.post_error,
+  });
+});
+
+app.post('/posts', requireAuth, upload.single('image'), (req, res) => {
+  const body = (req.body.body || '').trim();
+  if (!body) return res.redirect('/feed?post_error=empty');
+  const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+  const classId = (req.body.class_id || '').trim() || null;
+  db.createPost(req.session.userId, body, imagePath, classId);
+  const redirectClass = classId ? `?class=${classId}` : '';
+  res.redirect(`/feed${redirectClass}`);
+});
+
+app.get('/posts/:id', allowGuestOrAuth, (req, res) => {
+  const id = Number(req.params.id);
+  const post = db.getPostById(id);
+  if (!post) return res.status(404).render('profile-not-found', { title: 'Not Found', username: '' });
+  const replies = db.getRepliesByPostId(id).map((r) => ({ ...r, created_at: formatPostTime(r.created_at) }));
+  const likeCount = db.getLikeCount(id);
+  const dislikeCount = db.getDislikeCount(id);
+  const replyCount = db.getReplyCount(id);
+  const userId = req.session.userId || null;
+  const userLiked = userId ? db.getUserLike(id, userId) : false;
+  const userDisliked = userId ? db.getUserDislike(id, userId) : false;
+  const userSaved = userId ? db.isPostSavedByUser(userId, id) : false;
+  const currentUser = userId ? db.getUserById(userId) : null;
+  res.render('post-expanded', {
+    title: 'Post — ClassChat',
+    layout: 'layout',
+    post: { ...post, created_at: formatPostTime(post.created_at) },
+    replies,
+    likeCount,
+    dislikeCount,
+    replyCount,
+    userLiked,
+    userDisliked,
+    userSaved,
+    username: req.session.username || null,
+    userId,
+    currentUser,
+    is_staff: !!req.session.is_staff,
+    isGuest: !!req.session.guest,
+    district: req.session.district || DISTRICT,
+    school: req.session.school || SCHOOL,
+    reply_error: req.query.reply_error,
+  });
+});
+
+app.post('/posts/:id/replies', requireAuth, upload.single('image'), (req, res) => {
+  const id = Number(req.params.id);
+  const post = db.getPostById(id);
+  if (!post) return res.redirect('/feed');
+  const body = (req.body.body || '').trim();
+  if (!body) return res.redirect(`/posts/${id}?reply_error=empty`);
+  const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+  db.createReply(id, req.session.userId, body, imagePath);
+  if (post.user_id !== req.session.userId) db.createNotification(post.user_id, 'post_reply', req.session.userId, id);
+  res.redirect(`/posts/${id}`);
+});
+
+app.post('/posts/:id/like', requireAuth, (req, res) => {
+  const id = Number(req.params.id);
+  const post = db.getPostById(id);
+  if (!post) return res.redirect('/feed');
+  db.togglePostLike(id, req.session.userId);
+  if (post.user_id !== req.session.userId) db.createNotification(post.user_id, 'post_like', req.session.userId, id);
+  res.redirect(req.get('Referer') || `/posts/${id}`);
+});
+
+app.post('/posts/:id/dislike', requireAuth, (req, res) => {
+  const id = Number(req.params.id);
+  if (!db.getPostById(id)) return res.redirect('/feed');
+  db.togglePostDislike(id, req.session.userId);
+  res.redirect(req.get('Referer') || `/posts/${id}`);
+});
+
+app.get('/friends', requireAuth, (req, res) => {
+  const friends = db.getFriends(req.session.userId);
+  const currentUser = db.getUserById(req.session.userId);
+  res.render('friends', {
+    title: 'Friends — ClassChat',
+    friends,
+    currentUser,
+    username: req.session.username,
+    is_staff: !!req.session.is_staff,
+  });
+});
+
+app.get('/activity', requireAuth, (req, res) => {
+  const notifications = db.getNotificationsForUser(req.session.userId).map((n) => ({ ...n, created_at: formatPostTime(n.created_at) }));
+  const currentUser = db.getUserById(req.session.userId);
+  db.markNotificationsRead(req.session.userId);
+  res.render('activity', {
+    title: 'Activity — ClassChat',
+    notifications,
+    currentUser,
+    username: req.session.username,
+    is_staff: !!req.session.is_staff,
+  });
+});
+
+app.get('/search', requireAuth, (req, res) => {
+  const q = (req.query.q || '').trim();
+  const users = q ? db.searchUsers(q) : [];
+  const postsRaw = q ? db.searchPosts(q) : [];
+  const posts = postsRaw.map((p) => ({ ...p, created_at: formatPostTime(p.created_at) }));
+  const currentUser = db.getUserById(req.session.userId);
+  res.render('search', {
+    title: 'Search — ClassChat',
+    q,
+    users,
+    posts,
+    currentUser,
+    username: req.session.username,
+    is_staff: !!req.session.is_staff,
+  });
+});
+
+app.get('/saved', requireAuth, (req, res) => {
+  const raw = db.getSavedPostsByUser(req.session.userId);
+  const posts = raw.map((p) => ({
+    ...p,
+    created_at: formatPostTime(p.created_at),
+    likeCount: db.getLikeCount(p.id),
+    dislikeCount: db.getDislikeCount(p.id),
+    replyCount: db.getReplyCount(p.id),
+    userLiked: db.getUserLike(p.id, req.session.userId),
+    userDisliked: db.getUserDislike(p.id, req.session.userId),
+  }));
+  const currentUser = db.getUserById(req.session.userId);
+  res.render('saved', {
+    title: 'Saved — ClassChat',
+    posts,
+    currentUser,
+    username: req.session.username,
+    is_staff: !!req.session.is_staff,
+  });
+});
+
+app.post('/posts/:id/save', requireAuth, (req, res) => {
+  const id = Number(req.params.id);
+  if (!db.getPostById(id)) return res.redirect('/feed');
+  db.toggleSavePost(req.session.userId, id);
+  res.redirect(req.get('Referer') || `/posts/${id}`);
+});
+
+app.get('/messages', requireAuth, (req, res) => {
+  const allConversations = db.getConversations(req.session.userId);
+  const conversations = allConversations.filter((c) => db.areFriends(req.session.userId, c.id) || (c.username && c.username.toLowerCase() === SUPPORT_USERNAME.toLowerCase()));
+  const currentUser = db.getUserById(req.session.userId);
+  const pendingRequestsToMe = db.getPendingRequestsToMe(req.session.userId);
+  res.render('messages', {
+    title: 'Messages — ClassChat',
+    conversations,
+    pendingRequestsToMe,
+    currentUser,
+    username: req.session.username,
+    error: req.query.error,
+    is_staff: !!req.session.is_staff,
+  });
+});
+
+app.get('/messages/:username', requireAuth, (req, res) => {
+  const other = db.getUserByUsername(req.params.username);
+  const isSupport = other && other.username && other.username.toLowerCase() === SUPPORT_USERNAME.toLowerCase();
+  if (!other || other.id === req.session.userId) return res.redirect('/messages');
+  if (!isSupport && !db.areFriends(req.session.userId, other.id)) return res.redirect('/messages?error=not_friends');
+  const messages = db.getMessagesWithUser(req.session.userId, other.id).map((m) => ({ ...m, created_at: formatPostTime(m.created_at) }));
+  const currentUser = db.getUserById(req.session.userId);
+  res.render('conversation', {
+    title: `@${other.username} — ClassChat`,
+    other,
+    messages,
+    currentUser,
+    username: req.session.username,
+    userId: req.session.userId,
+    is_staff: !!req.session.is_staff,
+  });
+});
+
+app.post('/messages', requireAuth, (req, res) => {
+  const toUsername = (req.body.to || '').trim();
+  const body = (req.body.body || '').trim();
+  if (!toUsername || !body) return res.redirect('/messages');
+  const other = db.getUserByUsername(toUsername);
+  const isSupport = other && other.username && other.username.toLowerCase() === SUPPORT_USERNAME.toLowerCase();
+  if (!other || other.id === req.session.userId) return res.redirect('/messages');
+  if (!isSupport && !db.areFriends(req.session.userId, other.id)) return res.redirect('/messages?error=not_friends');
+  db.sendMessage(req.session.userId, other.id, body);
+  res.redirect(`/messages/${encodeURIComponent(other.username)}`);
+});
+
+app.get('/profile', requireAuth, (req, res) => {
+  res.redirect(`/u/${req.session.username}`);
+});
+
+app.get('/u/:username', requireAuth, (req, res) => {
+  const profileUser = db.getUserByUsername(req.params.username);
+  if (!profileUser) return res.status(404).render('profile-not-found', { title: 'Not Found', username: req.params.username });
+  const isOwn = req.session.userId === profileUser.id;
+  const friendStatus = isOwn ? 'self' : db.getFriendStatus(req.session.userId, profileUser.id);
+  const postsRaw = db.getPostsByUserId(profileUser.id);
+  const posts = postsRaw.map((p) => ({ ...p, created_at: formatPostTime(p.created_at) }));
+  res.render('profile', {
+    title: `@${profileUser.username} — ClassChat`,
+    profileUser,
+    isOwn,
+    friendStatus,
+    currentUsername: req.session.username,
+    posts,
+    is_staff: !!req.session.is_staff,
+  });
+});
+
+app.get('/profile/edit', requireAuth, (req, res) => {
+  const user = db.getUserById(req.session.userId);
+  res.render('profile-edit', {
+    title: 'Edit profile — ClassChat',
+    user,
+    username: req.session.username,
+    profileError: req.query.profile_error,
+    is_staff: !!req.session.is_staff,
+  });
+});
+
+app.post('/profile/edit', requireAuth, avatarUpload.single('avatar'), (req, res) => {
+  const displayName = (req.body.display_name || '').trim() || null;
+  const bio = (req.body.bio || '').trim() || null;
+  db.updateUserProfile(req.session.userId, displayName, bio);
+  if (req.body.remove_avatar === '1') {
+    db.updateUserAvatar(req.session.userId, null);
+  } else if (req.file) {
+    db.updateUserAvatar(req.session.userId, `/uploads/avatars/${req.file.filename}`);
+  }
+  res.redirect(`/u/${req.session.username}`);
+});
+
+app.post('/friends/request', requireAuth, (req, res) => {
+  const username = (req.body.username || '').trim();
+  const other = username ? db.getUserByUsername(username) : null;
+  if (!other || other.id === req.session.userId) return res.redirect(`/u/${username || 'feed'}`);
+  const status = db.getFriendStatus(req.session.userId, other.id);
+  if (status !== 'none') return res.redirect(`/u/${username}`);
+  db.sendFriendRequest(req.session.userId, other.id);
+  db.createNotification(other.id, 'friend_request', req.session.userId, null);
+  res.redirect(`/u/${username}`);
+});
+
+app.post('/friends/accept', requireAuth, (req, res) => {
+  const username = (req.body.username || '').trim();
+  const other = username ? db.getUserByUsername(username) : null;
+  if (!other) return res.redirect('/friends');
+  db.acceptFriendRequest(other.id, req.session.userId);
+  db.createNotification(other.id, 'friend_accepted', req.session.userId, null);
+  res.redirect(`/u/${username}`);
+});
+
+app.post('/friends/decline', requireAuth, (req, res) => {
+  const username = (req.body.username || '').trim();
+  const other = username ? db.getUserByUsername(username) : null;
+  if (other) db.declineFriendRequest(other.id, req.session.userId);
+  res.redirect('/messages');
+});
+
+app.post('/friends/remove', requireAuth, (req, res) => {
+  const username = (req.body.username || '').trim();
+  const other = username ? db.getUserByUsername(username) : null;
+  if (!other || other.id === req.session.userId) return res.redirect(`/u/${username || 'feed'}`);
+  db.removeFriend(req.session.userId, other.id);
+  res.redirect(`/u/${username}`);
+});
+
+db.ensureSupportUser();
+
+app.get('/staff/dashboard', requireStaff, (req, res) => {
+  const stats = db.getStats();
+  const classes = db.getClasses();
+  const maintenance = getMaintenanceMode();
+  const user = db.getUserById(req.session.userId);
+  const postsRaw = db.getAllPosts(100);
+  const posts = postsRaw.map((p) => ({ ...p, created_at: formatPostTime(p.created_at) }));
+  const users = db.getAllUsers();
+  const supportUser = db.getUserByUsername(SUPPORT_USERNAME);
+  const supportQueriesRaw = supportUser ? db.getConversations(supportUser.id) : [];
+  const supportQueries = supportQueriesRaw.map((q) => ({ ...q, last_at: q.last_at ? formatPostTime(q.last_at) : null }));
+  res.render('staff/dashboard', {
+    title: 'Staff Dashboard — ClassChat',
+    layout: 'staff-layout',
+    stats,
+    classes,
+    maintenance,
+    maintenanceMode: maintenance,
+    posts,
+    users,
+    supportQueries,
+    username: req.session.username,
+    user,
+  });
+});
+
+app.post('/staff/maintenance', requireStaff, (req, res) => {
+  setMaintenanceMode(!!req.body.enable);
+  res.redirect('/staff/dashboard');
+});
+
+app.post('/staff/maintenance/toggle', requireStaff, (req, res) => {
+  setMaintenanceMode(!getMaintenanceMode());
+  res.redirect('/staff/dashboard');
+});
+
+app.get('/staff/posts/:id/edit', requireStaff, (req, res) => {
+  const id = Number(req.params.id);
+  const post = db.getPostById(id);
+  if (!post) return res.redirect('/staff/dashboard');
+  const classes = db.getClasses();
+  res.render('staff/post-edit', {
+    title: 'Edit post — ClassChat',
+    layout: 'staff-layout',
+    post,
+    classes,
+    username: req.session.username,
+  });
+});
+
+app.post('/staff/posts/:id/edit', requireStaff, upload.single('image'), (req, res) => {
+  const id = Number(req.params.id);
+  const post = db.getPostById(id);
+  if (!post) return res.redirect('/staff/dashboard');
+  const body = (req.body.body || '').trim();
+  const imagePath = req.file ? `/uploads/${req.file.filename}` : post.image_path;
+  db.updatePost(id, body, imagePath);
+  res.redirect('/staff/dashboard');
+});
+
+app.post('/staff/posts/:id/delete', requireStaff, (req, res) => {
+  const id = Number(req.params.id);
+  if (db.getPostById(id)) db.deletePost(id);
+  res.redirect('/staff/dashboard');
+});
+
+app.get('/staff/users/:id/edit', requireStaff, (req, res) => {
+  const id = Number(req.params.id);
+  if (id === req.session.userId) return res.redirect('/staff/dashboard');
+  const user = db.getUserById(id);
+  if (!user) return res.redirect('/staff/dashboard');
+  res.render('staff/user-edit', {
+    title: 'Edit user — ClassChat',
+    layout: 'staff-layout',
+    editUser: user,
+    targetUser: user,
+    username: req.session.username,
+  });
+});
+
+app.post('/staff/users/:id/edit', requireStaff, (req, res) => {
+  const id = Number(req.params.id);
+  if (id === req.session.userId) return res.redirect('/staff/dashboard');
+  const user = db.getUserById(id);
+  if (!user) return res.redirect('/staff/dashboard');
+  const isStaff = req.body.is_staff === '1';
+  const database = db.getDb();
+  database.prepare('UPDATE users SET is_staff = ? WHERE id = ?').run(isStaff ? 1 : 0, id);
+  database.close();
+  res.redirect('/staff/dashboard');
+});
+
+app.get('/staff/profile', requireStaff, (req, res) => {
+  const user = db.getUserById(req.session.userId);
+  res.render('staff/profile', {
+    title: 'Staff profile — ClassChat',
+    layout: 'staff-layout',
+    user,
+    username: req.session.username,
+  });
+});
+
+app.get('/staff/support/:username', requireStaff, (req, res) => {
+  const supportUser = db.getUserByUsername(SUPPORT_USERNAME);
+  const other = db.getUserByUsername(req.params.username);
+  if (!supportUser || !other || other.username.toLowerCase() === SUPPORT_USERNAME.toLowerCase()) return res.redirect('/staff/dashboard');
+  const messages = db.getMessagesWithUser(supportUser.id, other.id).map((m) => ({ ...m, created_at: formatPostTime(m.created_at) }));
+  res.render('staff/support-conversation', {
+    title: `Support: @${other.username} — ClassChat`,
+    layout: 'staff-layout',
+    supportUser,
+    other,
+    messages,
+    username: req.session.username,
+  });
+});
+
+app.post('/staff/support/:username', requireStaff, (req, res) => {
+  const supportUser = db.getUserByUsername(SUPPORT_USERNAME);
+  const other = db.getUserByUsername(req.params.username);
+  if (!supportUser || !other || other.username.toLowerCase() === SUPPORT_USERNAME.toLowerCase()) return res.redirect('/staff/dashboard');
+  const body = (req.body.body || '').trim();
+  if (body) db.sendMessage(supportUser.id, other.id, body);
+  res.redirect(`/staff/support/${encodeURIComponent(other.username)}`);
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`ClassChat running at http://localhost:${PORT}`);
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        console.log(`  local: http://${net.address}:${PORT}`);
+        break;
+      }
+    }
+  }
+  https.get('https://ifconfig.me/ip', { timeout: 3000 }, (res) => {
+    let ip = '';
+    res.on('data', (c) => (ip += c));
+    res.on('end', () => {
+      ip = ip.trim();
+      if (ip) console.log(`  internet: http://${ip}:${PORT}`);
+    });
+  }).on('error', () => {});
+});
