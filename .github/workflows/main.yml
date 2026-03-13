@@ -1,4 +1,4 @@
-name: ClassChat Quick
+name: ClassChat Live
 on: [push, workflow_dispatch]
 
 jobs:
@@ -38,4 +38,4 @@ jobs:
           cloudflared tunnel --url http://localhost:5000 &
           
           # Keep the runner alive for 1 hour to use the app
-          sleep 3600
+          sleep 21600
