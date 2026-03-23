@@ -26,7 +26,7 @@ FIx Push Notifications
 
 2. Next, run the command `cd classchatnode`
 
-3. Now, run the command `unzip FOlders.zip`
+3. Now, run the command `unzip Folders.zip`
 
 4. Then, run the command `npm install`
 
