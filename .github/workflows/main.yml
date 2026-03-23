@@ -1,5 +1,5 @@
 name: ClassChat Live
-on: [push, workflow_dispatch]
+on: workflow_dispatch
 
 jobs:
   launch:
