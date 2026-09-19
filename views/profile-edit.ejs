@@ -1,0 +1,59 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= user.username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/search">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= user.username %><% if (['emoticonyt', 'doriandelvalle'].includes((user.username || '').toLowerCase())) { %> <span class="owner-badge">Owner</span><% } %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="profile-edit-page">
+  <div class="auth-card" style="max-width:480px;margin:0 auto;">
+    <h1>Edit profile</h1>
+    <% if (profileError === 'username_taken') { %><p class="form-error">That display name is already in use.</p><% } %>
+    <form action="/profile/edit" method="post" enctype="multipart/form-data" class="auth-form">
+      <div class="field field-avatar">
+        <label>Profile photo</label>
+        <div class="avatar-edit-row">
+          <% if (user.avatar_path) { %>
+          <img src="<%= user.avatar_path %>" alt="Current" class="avatar-preview">
+          <% } else { %>
+          <div class="avatar-preview avatar-preview-initial"><%= (user.display_name || user.username).charAt(0).toUpperCase() %></div>
+          <% } %>
+          <div class="avatar-edit-upload">
+            <input type="file" name="avatar" accept="image/jpeg,image/png,image/gif,image/webp" id="avatar">
+            <span class="muted" style="font-size:0.85rem;">JPEG, PNG, GIF or WebP · max 2MB</span>
+            <% if (user.avatar_path) { %>
+            <label class="avatar-remove-label">
+              <input type="checkbox" name="remove_avatar" value="1"> Remove photo
+            </label>
+            <% } %>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="display_name">Display name</label>
+        <input type="text" id="display_name" name="display_name" placeholder="How you want to be shown" value="<%= user.display_name || '' %>" maxlength="64">
+      </div>
+      <div class="field">
+        <label for="bio">Bio</label>
+        <textarea id="bio" name="bio" rows="4" placeholder="A short bio (optional)" maxlength="500"><%= user.bio || '' %></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Save</button>
+      <a href="/u/<%= user.username %>" class="btn btn-ghost" style="margin-left:12px;">Cancel</a>
+    </form>
+  </div>
+</main>

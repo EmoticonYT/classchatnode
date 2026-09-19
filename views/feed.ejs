@@ -1,0 +1,160 @@
+<main class="feed-layout">
+  <section class="feed">
+    <!-- Floating Bubble: Header and Class Filters directly over Post Area -->
+    <div class="feed-header-bubble">
+      <div class="feed-header-top">
+        <h2><%= currentClass ? currentClass.name : 'Feed' %></h2>
+        <p class="muted"><%= currentClass ? 'Posts in this class' : (school ? 'Updates from ' + school : 'Latest updates') %></p>
+      </div>
+      <div class="feed-classes-bar" role="navigation" aria-label="Class filters">
+        <a href="/feed" class="feed-class-pill <%= !currentClass ? 'active' : '' %>">
+          <span class="pill-icon">🏫</span>
+          <span>All Classes</span>
+        </a>
+        <% if (typeof classes !== 'undefined' && classes.length) { %>
+        <% classes.forEach(function(c) { %>
+        <a href="/feed?class=<%= c.id %>" class="feed-class-pill <%= currentClass && currentClass.id == c.id ? 'active' : '' %>">
+          <span class="pill-icon">📚</span>
+          <span><%= c.name %></span>
+        </a>
+        <% }); %>
+        <% } %>
+      </div>
+    </div>
+    <% if (typeof userId !== 'undefined' && userId) { %>
+    <form action="/posts" method="post" enctype="multipart/form-data" class="post-compose-form">
+      <% if (postError === 'empty') { %><p class="form-error">Write something to post.</p><% } %>
+      <div class="post-compose">
+        <% if (typeof currentUser !== 'undefined' && currentUser && currentUser.avatar_path) { %>
+        <img src="<%= currentUser.avatar_path %>" alt="" class="compose-avatar compose-avatar-img">
+        <% } else { %>
+        <div class="compose-avatar"><%= (username || '?').charAt(0).toUpperCase() %></div>
+        <% } %>
+        <div class="compose-fields">
+          <textarea name="body" placeholder="Share something with your class..." rows="3" maxlength="2000"></textarea>
+          <div class="compose-actions">
+            <div class="compose-actions-left">
+              <div class="compose-row">
+                <label class="class-select-label">Post to</label>
+                <select name="class_id" class="class-select">
+                  <option value="">General</option>
+                  <% if (typeof classes !== 'undefined' && classes.length) { %>
+                  <% classes.forEach(function(c) { %>
+                  <option value="<%= c.id %>" <%= currentClass && currentClass.id == c.id ? 'selected' : '' %>><%= c.name %></option>
+                  <% }); %>
+                  <% } %>
+                </select>
+              </div>
+              <div class="compose-attachments">
+                <label class="file-label" title="Attach photo">
+                  <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp" class="file-input">
+                  <span class="btn-attach">📷 Photo</span>
+                </label>
+                <label class="file-label" title="Attach file">
+                  <input type="file" name="file" class="file-input">
+                  <span class="btn-attach">📎 File</span>
+                </label>
+                <label class="file-label" title="Attach video">
+                  <input type="file" name="video" accept="video/*" class="file-input">
+                  <span class="btn-attach">🎬 Video</span>
+                </label>
+              </div>
+            </div>
+            <div class="compose-actions-right">
+              <span class="file-hint">Max 5MB</span>
+              <button type="submit" class="btn btn-primary compose-submit-btn">Post</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+    <% } else { %>
+    <p class="guest-compose-hint muted">Log in to post, like, reply, and save. <a href="/join">Log in</a> · <a href="/join">Sign up</a></p>
+    <% } %>
+    <div class="posts">
+      <% if (posts.length === 0) { %>
+      <article class="post post-welcome">
+        <div class="post-avatar">🏫</div>
+        <div class="post-body">
+          <div class="post-meta">
+            <span class="post-author">ClassChat</span>
+            <span class="post-time">Welcome</span>
+          </div>
+          <p class="post-text">No posts yet. Be the first to share something with your class!</p>
+        </div>
+      </article>
+      <% } else { %>
+      <% posts.forEach(function(post) { %>
+      <article class="post post-card" data-post-id="<%= post.id %>">
+        <div class="post-top-row">
+          <% if (post.author_avatar) { %>
+          <img src="<%= post.author_avatar %>" alt="" class="post-avatar post-avatar-img">
+          <% } else { %>
+          <div class="post-avatar"><%= (post.display_name || post.username || '?').charAt(0).toUpperCase() %></div>
+          <% } %>
+          <div class="post-body">
+            <div class="post-meta">
+              <span class="post-author">
+                <a href="/u/<%= post.username %>" class="post-author-link">
+                  <strong class="post-display-name"><%= post.display_name || post.username %></strong>
+                  <span class="post-handle muted">@<%= post.username %></span>
+                </a>
+                <% if (['emoticonyt', 'doriandelvalle'].includes((post.username || '').toLowerCase())) { %> <span class="owner-badge">Owner</span><% } %>
+              </span>
+              <% if (post.class_name) { %><span class="post-class-badge"><%= post.class_name %></span><% } %>
+              <span class="post-time"><%= post.created_at %></span>
+            </div>
+            <a href="/posts/<%= post.id %>" class="post-content-link">
+              <p class="post-text"><%= post.body %></p>
+              <% if (post.image_path) { %>
+              <div class="post-image-wrap">
+                <img src="<%= post.image_path %>" alt="Post image" class="post-image" loading="lazy">
+              </div>
+              <% } %>
+              <% if (post.file_path) { %><p class="post-attachment"><a href="<%= post.file_path %>" target="_blank" rel="noopener">📎 Attachment</a></p><% } %>
+              <% if (post.video_path) { %><p class="post-attachment"><a href="<%= post.video_path %>" target="_blank" rel="noopener">🎬 Video</a></p><% } %>
+            </a>
+          </div>
+        </div>
+        <div class="post-controls">
+          <% if (typeof userId !== 'undefined' && userId) { %>
+          <form action="/posts/<%= post.id %>/like" method="post" class="post-control-inline">
+            <button type="submit" class="post-control-btn <%= post.userLiked ? 'active' : '' %>">👍 <span><%= post.likeCount %></span></button>
+          </form>
+          <form action="/posts/<%= post.id %>/dislike" method="post" class="post-control-inline">
+            <button type="submit" class="post-control-btn <%= post.userDisliked ? 'active' : '' %>">👎 <span><%= post.dislikeCount %></span></button>
+          </form>
+          <a href="/posts/<%= post.id %>#reply-form" class="post-control-btn">💬 <span><%= post.replyCount %></span></a>
+          <form action="/posts/<%= post.id %>/save" method="post" class="post-control-inline">
+            <button type="submit" class="post-control-btn <%= post.userSaved ? 'active' : '' %>" title="<%= post.userSaved ? 'Unsave' : 'Save' %>">🔖</button>
+          </form>
+          <% if (post.user_id === userId) { %>
+          <form action="/posts/<%= post.id %>/delete" method="post" class="post-control-inline" onsubmit="return confirm('Delete this post?');">
+            <button type="submit" class="post-control-btn post-control-delete" title="Delete">🗑</button>
+          </form>
+          <% } %>
+          <% } else { %>
+          <span class="post-control-btn post-control-readonly">👍 <span><%= post.likeCount %></span></span>
+          <span class="post-control-btn post-control-readonly">👎 <span><%= post.dislikeCount %></span></span>
+          <a href="/posts/<%= post.id %>" class="post-control-btn">💬 <span><%= post.replyCount %></span></a>
+          <span class="post-control-btn post-control-readonly">🔖</span>
+          <% } %>
+        </div>
+      </article>
+      <% }); %>
+      <% } %>
+    </div>
+  </section>
+  <aside class="sidebar right">
+    <% if (school || district) { %>
+    <div class="sidebar-card">
+      <% if (school) { %><h3 style="margin-bottom: 4px;"><%= school %></h3><% } %>
+      <% if (district) { %><p class="muted" style="margin: 0;"><%= district %></p><% } %>
+    </div>
+    <% } %>
+    <div class="sidebar-card">
+      <h3>About ClassChat</h3>
+      <p class="muted" style="margin: 0;">A student-led space for <%= school ? school + ' ' : '' %>students to connect, collaborate, and share.</p>
+    </div>
+  </aside>
+</main>

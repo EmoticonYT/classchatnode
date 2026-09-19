@@ -1,0 +1,73 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/search" class="active">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="search-page">
+  <div class="page-title-bubble">
+    <h1>Search</h1>
+    <form action="/search" method="get" class="search-form" style="margin-top: 14px;">
+      <input type="search" name="q" value="<%= typeof q !== 'undefined' ? q : '' %>" placeholder="Search people or posts..." class="search-input" autofocus>
+      <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+  </div>
+  <% if (typeof q !== 'undefined' && q) { %>
+  <section class="search-results">
+    <% if (users.length > 0) { %>
+    <h2>People</h2>
+    <ul class="search-users-list">
+      <% users.forEach(function(u) { %>
+      <li class="search-user-item">
+        <a href="/u/<%= u.username %>" class="search-user-link">
+          <% if (u.avatar_path) { %>
+          <img src="<%= u.avatar_path %>" alt="" class="search-user-avatar">
+          <% } else { %>
+          <div class="search-user-avatar search-user-avatar-initial"><%= (u.display_name || u.username || '?').charAt(0).toUpperCase() %></div>
+          <% } %>
+          <div class="search-user-info">
+            <span class="search-user-name"><%= u.display_name || u.username %></span>
+            <span class="muted">@<%= u.username %></span>
+          </div>
+        </a>
+      </li>
+      <% }); %>
+    </ul>
+    <% } %>
+    <% if (posts.length > 0) { %>
+    <h2>Posts</h2>
+    <ul class="search-posts-list">
+      <% posts.forEach(function(p) { %>
+      <li class="search-post-item">
+        <a href="/posts/<%= p.id %>" class="search-post-link">
+          <p class="search-post-body"><%= p.body.length > 120 ? p.body.slice(0, 120) + '…' : p.body %></p>
+          <span class="muted"><strong><%= p.display_name || p.username %></strong> (@<%= p.username %>) · <%= p.created_at %></span>
+        </a>
+      </li>
+      <% }); %>
+    </ul>
+    <% } %>
+    <% if (users.length === 0 && posts.length === 0) { %>
+    <p class="muted">No people or posts found for “<%= q %>”.</p>
+    <% } %>
+  </section>
+  <% } else { %>
+  <p class="muted">Enter a search term above to find people or posts.</p>
+  <% } %>
+</main>

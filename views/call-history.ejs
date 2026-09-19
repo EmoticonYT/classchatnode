@@ -1,0 +1,41 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/call-history" class="active">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="call-history-page">
+  <div class="page-title-bubble">
+    <h1>Call history</h1>
+    <p class="muted">Your past audio and video calls</p>
+  </div>
+  <% if (history.length === 0) { %>
+  <div class="empty-card">
+    <p class="muted" style="margin:0;">No calls yet.</p>
+  </div>
+  <% } else { %>
+  <ul class="call-history-list" style="list-style: none; padding: 0;">
+    <% history.forEach(function(h) { %>
+    <% const otherName = h.caller_id === userId ? (h.callee_display_name ? h.callee_display_name + ' (@' + h.callee_username + ')' : '@' + h.callee_username) : (h.caller_display_name ? h.caller_display_name + ' (@' + h.caller_username + ')' : '@' + h.caller_username); %>
+    <li style="padding: 12px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+      <span><%= h.caller_id === userId ? 'Outgoing' : 'Incoming' %> <%= h.video ? '📹 Video' : '🎧 Audio' %> with <%= otherName %></span>
+      <span class="muted"><%= h.started_at %><% if (h.duration_sec) { %> · <%= h.duration_sec %>s<% } %></span>
+    </li>
+    <% }); %>
+  </ul>
+  <% } %>
+</main>

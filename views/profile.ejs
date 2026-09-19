@@ -1,0 +1,127 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= currentUsername %>" class="active">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/search">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= currentUsername %><% if (['emoticonyt', 'doriandelvalle'].includes((currentUsername || '').toLowerCase())) { %> <span class="owner-badge">Owner</span><% } %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="profile-page">
+  <div class="profile-hero">
+    <% if (profileUser.avatar_path) { %>
+    <img src="<%= profileUser.avatar_path %>" alt="" class="profile-avatar-large profile-avatar-img">
+    <% } else { %>
+    <div class="profile-avatar-large"><%= (profileUser.display_name || profileUser.username).charAt(0).toUpperCase() %></div>
+    <% } %>
+    <h1><%= profileUser.display_name || profileUser.username %></h1>
+    <p class="profile-username">@<%= profileUser.username %><% if (['emoticonyt', 'doriandelvalle'].includes((profileUser.username || '').toLowerCase())) { %> <span class="owner-badge">Owner</span><% } %></p>
+    <% if (profileUser.bio) { %><p class="profile-bio"><%= profileUser.bio %></p><% } %>
+    <% if (isOwn) { %>
+    <a href="/profile/edit" class="btn btn-primary">Edit profile</a>
+    <% } else { %>
+    <div class="profile-actions">
+      <% if (friendStatus === 'friends') { %>
+      <a href="/messages/<%= profileUser.username %>" class="btn btn-primary">Message</a>
+      <form action="/friends/remove" method="post" class="profile-action-form">
+        <input type="hidden" name="username" value="<%= profileUser.username %>">
+        <button type="submit" class="btn btn-ghost">Remove friend</button>
+      </form>
+      <% } else if (friendStatus === 'pending_sent') { %>
+      <span class="btn btn-ghost btn-disabled">Friend request sent</span>
+      <% } else if (friendStatus === 'pending_received') { %>
+      <form action="/friends/accept" method="post" class="profile-action-form inline">
+        <input type="hidden" name="username" value="<%= profileUser.username %>">
+        <button type="submit" class="btn btn-primary">Accept request</button>
+      </form>
+      <form action="/friends/decline" method="post" class="profile-action-form inline">
+        <input type="hidden" name="username" value="<%= profileUser.username %>">
+        <button type="submit" class="btn btn-ghost">Decline</button>
+      </form>
+      <% } else { %>
+      <form action="/friends/request" method="post" class="profile-action-form">
+        <input type="hidden" name="username" value="<%= profileUser.username %>">
+        <button type="submit" class="btn btn-primary">Add friend</button>
+      </form>
+      <% } %>
+      <% if (!isOwn && typeof isBlockedByMe !== 'undefined') { %>
+      <% if (isBlockedByMe) { %>
+      <form action="/unblock/<%= encodeURIComponent(profileUser.username) %>?redirect=/u/<%= encodeURIComponent(profileUser.username) %>" method="post" class="profile-action-form inline">
+        <button type="submit" class="btn btn-ghost">Unblock</button>
+      </form>
+      <% } else { %>
+      <form action="/block/<%= encodeURIComponent(profileUser.username) %>?redirect=/u/<%= encodeURIComponent(profileUser.username) %>" method="post" class="profile-action-form inline">
+        <button type="submit" class="btn btn-ghost">Block</button>
+      </form>
+      <% } %>
+      <button type="button" class="btn btn-ghost report-btn" data-target-type="user" data-target-id="<%= profileUser.id %>">Report</button>
+      <% } %>
+    </div>
+    <% } %>
+  </div>
+  <section class="profile-posts">
+    <h2><%= isOwn ? 'Your posts' : 'Posts' %></h2>
+    <% if (posts.length === 0) { %>
+    <div class="empty-card">
+      <p class="muted" style="margin:0;">No posts yet.</p>
+    </div>
+    <% } else { %>
+    <div class="posts">
+      <% posts.forEach(function(post) { %>
+      <article class="post post-card">
+        <% if (post.author_avatar) { %>
+        <img src="<%= post.author_avatar %>" alt="" class="post-avatar post-avatar-img">
+        <% } else { %>
+        <div class="post-avatar"><%= (post.display_name || post.username || '?').charAt(0).toUpperCase() %></div>
+        <% } %>
+        <div class="post-body">
+          <div class="post-meta">
+            <span class="post-author">
+              <a href="/u/<%= post.username %>" class="post-author-link">
+                <strong class="post-display-name"><%= post.display_name || post.username %></strong>
+                <span class="post-handle muted">@<%= post.username %></span>
+              </a>
+              <% if (['emoticonyt', 'doriandelvalle'].includes((post.username || '').toLowerCase())) { %> <span class="owner-badge">Owner</span><% } %>
+            </span>
+            <span class="post-time"><%= post.created_at %></span>
+          </div>
+          <p class="post-text"><%= post.body %></p>
+          <% if (post.image_path) { %>
+          <div class="post-image-wrap">
+            <img src="<%= post.image_path %>" alt="Post" class="post-image" loading="lazy">
+          </div>
+          <% } %>
+        </div>
+      </article>
+      <% }); %>
+    </div>
+    <% } %>
+  </section>
+</main>
+<script>
+document.querySelectorAll('.report-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var type = this.getAttribute('data-target-type');
+    var id = this.getAttribute('data-target-id');
+    var reason = prompt('Reason for report (optional):');
+    if (reason === null) return;
+    fetch('/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ target_type: type, target_id: id, reason: reason }) })
+      .then(function(r) { return r.json(); })
+      .then(function() { alert('Report submitted.'); })
+      .catch(function() { alert('Could not submit report.'); });
+  });
+});
+</script>

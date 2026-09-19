@@ -1,0 +1,161 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support">Support</a>
+      <a href="/staff/dashboard" class="active">Staff</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %><% if (typeof district !== 'undefined' && district) { %> · <%= district %><% } %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="staff-page" style="max-width: 960px; margin: 0 auto; padding: 24px;">
+  <div class="staff-page-header">
+    <h1>Moderator Audit Log</h1>
+    <p class="staff-page-subtitle">Complete, unerasable historical record of all administrative and moderation actions.</p>
+  </div>
+
+  <div class="staff-subnav">
+    <a href="/staff/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
+    <a href="/staff/support" class="btn btn-ghost btn-sm">Support Queue (<%= typeof supportStats !== 'undefined' ? supportStats.open : 0 %> open)</a>
+    <a href="/staff/audit-log" class="btn btn-primary btn-sm">Audit Log (<%= typeof total !== 'undefined' ? total : 0 %>)</a>
+    <a href="/staff/profile" class="btn btn-ghost btn-sm">Staff Profile</a>
+  </div>
+
+  <!-- Immutable notice banner -->
+  <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; font-size: 0.88rem; color: var(--text);">
+    <span style="font-size: 1.3rem;">🔒</span>
+    <div>
+      <strong>Immutable Security Log:</strong> Every action taken by a moderator or administrator is permanently recorded in an append-only log. Entries cannot be edited, modified, or cleared.
+    </div>
+  </div>
+
+  <!-- Filter & Search Bar -->
+  <div class="staff-section" style="padding: 16px 20px; margin-bottom: 20px;">
+    <form action="/staff/audit-log" method="get" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+      <div style="flex: 1; min-width: 200px;">
+        <input type="text" name="q" value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>" placeholder="Search by moderator, target, or details..." style="width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 0.9rem;">
+      </div>
+      <div>
+        <select name="action" style="padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 0.9rem;">
+          <option value="all" <%= (!actionFilter || actionFilter === 'all') ? 'selected' : '' %>>All Action Types</option>
+          <option value="TIMEOUT" <%= actionFilter === 'TIMEOUT' ? 'selected' : '' %>>Timeouts</option>
+          <option value="MOD_TIMEOUT" <%= actionFilter === 'MOD_TIMEOUT' ? 'selected' : '' %>>Moderator Timeouts</option>
+          <option value="UNTIMEOUT" <%= actionFilter === 'UNTIMEOUT' ? 'selected' : '' %>>Timeout Reversals</option>
+          <option value="BAN" <%= actionFilter === 'BAN' ? 'selected' : '' %>>Account Bans</option>
+          <option value="UNBAN" <%= actionFilter === 'UNBAN' ? 'selected' : '' %>>Ban Reversals</option>
+          <option value="DELETE_POST" <%= actionFilter === 'DELETE_POST' ? 'selected' : '' %>>Post Deletions</option>
+          <option value="EDIT_POST" <%= actionFilter === 'EDIT_POST' ? 'selected' : '' %>>Post Edits</option>
+          <option value="EDIT_USER" <%= actionFilter === 'EDIT_USER' ? 'selected' : '' %>>User Profile Edits</option>
+          <option value="DELETE_USER" <%= actionFilter === 'DELETE_USER' ? 'selected' : '' %>>User Deletions</option>
+          <option value="MAINTENANCE" <%= actionFilter === 'MAINTENANCE' ? 'selected' : '' %>>System Maintenance</option>
+          <option value="TICKET_STATUS" <%= actionFilter === 'TICKET_STATUS' ? 'selected' : '' %>>Ticket Status Changes</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm" style="padding: 8px 16px;">Filter Log</button>
+      <% if ((actionFilter && actionFilter !== 'all') || searchQuery) { %>
+        <a href="/staff/audit-log" class="btn btn-ghost btn-sm">Clear Filter</a>
+      <% } %>
+    </form>
+  </div>
+
+  <!-- Audit Log Records Table -->
+  <div class="staff-section" style="padding: 0; overflow-x: auto;">
+    <% if (logs && logs.length) { %>
+    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">
+          <th style="padding: 12px 16px;">Timestamp</th>
+          <th style="padding: 12px 16px;">Moderator</th>
+          <th style="padding: 12px 16px;">Action</th>
+          <th style="padding: 12px 16px;">Target Account</th>
+          <th style="padding: 12px 16px;">Details / Stated Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% logs.forEach(function(l) { %>
+        <tr style="border-bottom: 1px solid var(--border); transition: background 0.15s ease;">
+          <!-- Timestamp -->
+          <td style="padding: 12px 16px; white-space: nowrap; color: var(--text-muted); font-size: 0.84rem;">
+            <%= l.created_at_fmt %>
+          </td>
+
+          <!-- Moderator -->
+          <td style="padding: 12px 16px; font-weight: 600;">
+            <span style="color: var(--accent);">@<%= l.actor_username %></span>
+          </td>
+
+          <!-- Action Badge -->
+          <td style="padding: 12px 16px;">
+            <% if (l.action === 'BAN') { %>
+              <span style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em;">BAN</span>
+            <% } else if (l.action === 'UNBAN') { %>
+              <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em;">UNBAN</span>
+            <% } else if (l.action === 'TIMEOUT' || l.action === 'MOD_TIMEOUT') { %>
+              <span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em;"><%= l.action %></span>
+            <% } else if (l.action === 'UNTIMEOUT') { %>
+              <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em;">UNTIMEOUT</span>
+            <% } else if (l.action.startsWith('DELETE')) { %>
+              <span style="background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em;"><%= l.action %></span>
+            <% } else if (l.action.startsWith('EDIT')) { %>
+              <span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em;"><%= l.action %></span>
+            <% } else if (l.action === 'MAINTENANCE') { %>
+              <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em;">SYSTEM</span>
+            <% } else { %>
+              <span style="background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); padding: 3px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 600;"><%= l.action %></span>
+            <% } %>
+          </td>
+
+          <!-- Target Account -->
+          <td style="padding: 12px 16px;">
+            <% if (l.target_username) { %>
+              <a href="/u/<%= l.target_username %>" style="color: var(--text); text-decoration: none; font-weight: 500;">
+                @<%= l.target_username %>
+              </a>
+            <% } else { %>
+              <span class="muted">—</span>
+            <% } %>
+          </td>
+
+          <!-- Details -->
+          <td style="padding: 12px 16px; color: var(--text); max-width: 320px; word-break: break-word;">
+            <%= l.details || '—' %>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <% } else { %>
+    <div style="padding: 48px 24px; text-align: center;" class="muted">
+      <div style="font-size: 2rem; margin-bottom: 8px;">🛡️</div>
+      <p>No audit log records match your current filter.</p>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Pagination -->
+  <% if (totalPages > 1) { %>
+  <div style="display: flex; justify-content: center; gap: 8px; margin-top: 24px;">
+    <% if (page > 1) { %>
+      <a href="/staff/audit-log?page=<%= page - 1 %>&action=<%= actionFilter %>&q=<%= encodeURIComponent(searchQuery || '') %>" class="btn btn-ghost btn-sm">← Previous</a>
+    <% } %>
+    <span style="padding: 6px 12px; font-size: 0.88rem; color: var(--text-muted); display: flex; align-items: center;">Page <%= page %> of <%= totalPages %></span>
+    <% if (page < totalPages) { %>
+      <a href="/staff/audit-log?page=<%= page + 1 %>&action=<%= actionFilter %>&q=<%= encodeURIComponent(searchQuery || '') %>" class="btn btn-ghost btn-sm">Next →</a>
+    <% } %>
+  </div>
+  <% } %>
+</main>

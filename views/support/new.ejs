@@ -1,0 +1,75 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support" class="active">Support</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="support-page" style="max-width: 680px; margin: 0 auto; padding: 24px;">
+  <p style="margin: 0 0 16px;"><a href="/support" class="btn btn-ghost btn-sm">← Back to Help Center</a></p>
+
+  <div class="ticket-form-card">
+    <h1 style="margin: 0 0 8px; font-size: 1.5rem; color: var(--text);">Open a Support Ticket</h1>
+    <p class="muted" style="margin: 0 0 20px;">Describe what you need help with. School staff and moderators will review your request promptly.</p>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+    <div class="form-error" style="color: #ef4444; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px;"><%= error %></div>
+    <% } %>
+
+    <form action="/support/new" method="post">
+      <div class="form-group-custom">
+        <label for="subject">Subject *</label>
+        <input type="text" id="subject" name="subject" class="form-control-custom" placeholder="Brief summary of your question or issue" required autocomplete="off">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group-custom" style="margin-bottom:0;">
+          <label for="category">Category</label>
+          <select id="category" name="category" class="form-control-custom">
+            <option value="general">General Inquiry</option>
+            <option value="account">Account &amp; Login</option>
+            <option value="bug">Bug or Technical Glitch</option>
+            <option value="report">Report Content or User</option>
+            <option value="feature">Feature Request</option>
+          </select>
+        </div>
+        <div class="form-group-custom" style="margin-bottom:0;">
+          <label for="priority">Priority</label>
+          <select id="priority" name="priority" class="form-control-custom">
+            <option value="low">Low (General question)</option>
+            <option value="normal" selected>Normal (Standard inquiry)</option>
+            <option value="high">High (Impacting coursework)</option>
+            <option value="urgent">Urgent (Safety / Account locked)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group-custom" style="margin-top:16px;">
+        <label for="message">Detailed Description *</label>
+        <textarea id="message" name="message" class="reply-textarea" style="min-height:150px;" placeholder="Provide as much detail as possible so our team can resolve your inquiry quickly..." required></textarea>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;">
+        <a href="/support" class="btn btn-ghost">Cancel</a>
+        <button type="submit" class="btn btn-primary" style="padding:10px 24px;font-weight:600;">Submit Ticket</button>
+      </div>
+    </form>
+  </div>
+</main>

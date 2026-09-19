@@ -1,0 +1,69 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support">Support</a>
+      <a href="/staff/dashboard" class="active">Staff</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %><% if (typeof district !== 'undefined' && district) { %> · <%= district %><% } %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="staff-page" style="max-width: 600px; margin: 0 auto; padding: 24px;">
+  <div class="staff-page-header">
+    <h1>Staff Profile</h1>
+    <p class="staff-page-subtitle">Your official staff credentials and information.</p>
+  </div>
+
+  <div class="staff-subnav">
+    <a href="/staff/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
+    <a href="/staff/support" class="btn btn-ghost btn-sm">Support Queue</a>
+    <a href="/staff/audit-log" class="btn btn-ghost btn-sm">Audit Log</a>
+    <a href="/staff/profile" class="btn btn-primary btn-sm">Staff Profile</a>
+  </div>
+
+  <div class="staff-section" style="padding: 24px;">
+    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+      <% if (user.avatar_path) { %>
+      <img src="<%= user.avatar_path %>" alt="" class="staff-avatar" style="width: 56px; height: 56px;">
+      <% } else { %>
+      <div class="staff-avatar staff-avatar-initial" style="width: 56px; height: 56px; font-size: 1.5rem;"><%= (user.username || '?').charAt(0).toUpperCase() %></div>
+      <% } %>
+      <div>
+        <h2 style="margin: 0 0 4px; font-size: 1.3rem;">@<%= user.username %><% if (['emoticonyt', 'doriandelvalle'].includes((user.username || '').toLowerCase())) { %> <span class="owner-badge">Owner</span><% } %></h2>
+        <span class="staff-badge">Staff Member</span>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 140px 1fr; gap: 10px; font-size: 0.9rem; border-top: 1px solid var(--border); padding-top: 16px;">
+      <span class="muted">School ID:</span>
+      <span><%= user.school_id || '—' %></span>
+
+      <% if (user.district) { %>
+      <span class="muted">District:</span>
+      <span><%= user.district %></span>
+      <% } %>
+
+      <% if (user.school) { %>
+      <span class="muted">School:</span>
+      <span><%= user.school %></span>
+      <% } %>
+
+      <span class="muted">Joined:</span>
+      <span><%= user.created_at %></span>
+    </div>
+  </div>
+</main>

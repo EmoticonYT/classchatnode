@@ -195,15 +195,130 @@ function initDb() {
   try {
     db.exec(`ALTER TABLE posts ADD COLUMN poll_id INTEGER REFERENCES polls(id)`);
   } catch (_) {}
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      subject TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'general',
+      priority TEXT NOT NULL DEFAULT 'normal',
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      resolved_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
+    CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_id);
+    CREATE TABLE IF NOT EXISTS support_ticket_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticket_id INTEGER NOT NULL,
+      sender_id INTEGER NOT NULL,
+      is_staff INTEGER NOT NULL DEFAULT 0,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE,
+      FOREIGN KEY (sender_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_support_ticket_messages_ticket ON support_ticket_messages(ticket_id);
+    CREATE TABLE IF NOT EXISTS chatrooms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'public',
+      created_by INTEGER,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    );
+    CREATE TABLE IF NOT EXISTS chatroom_members (
+      chatroom_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      joined_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (chatroom_id, user_id),
+      FOREIGN KEY (chatroom_id) REFERENCES chatrooms(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS chatroom_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chatroom_id INTEGER NOT NULL,
+      sender_id INTEGER NOT NULL,
+      body TEXT NOT NULL,
+      reply_to_message_id INTEGER,
+      image_path TEXT,
+      file_path TEXT,
+      video_path TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (chatroom_id) REFERENCES chatrooms(id) ON DELETE CASCADE,
+      FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_chatroom_messages_room ON chatroom_messages(chatroom_id, id DESC);
+
+    CREATE TABLE IF NOT EXISTS moderator_audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor_id INTEGER NOT NULL,
+      actor_username TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target_id INTEGER DEFAULT NULL,
+      target_username TEXT DEFAULT NULL,
+      details TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mod_audit_log_created ON moderator_audit_log(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_mod_audit_log_action ON moderator_audit_log(action);
+  `);
+  try {
+    db.exec(`ALTER TABLE user_settings ADD COLUMN seen_whats_new_version TEXT`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE user_settings ADD COLUMN accent_color TEXT DEFAULT NULL`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN timeout_until TEXT DEFAULT NULL`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN timeout_reason TEXT DEFAULT NULL`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN ban_reason TEXT DEFAULT NULL`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN banned_at TEXT DEFAULT NULL`);
+  } catch (_) {}
   db.close();
   seedStaffUser();
   seedCCSupport();
+  seedWNTestUser();
+  seedDefaultChatrooms();
 }
 
 const STAFF_USERNAME = 'doriandelvalle';
 const STAFF_PASSWORD = '825nancyd';
 const CC_SUPPORT_USERNAME = 'CCSupport';
 const CC_SUPPORT_PASSWORD = 'ccsupport';
+const WN_TEST_USERNAME = 'wn-test';
+const WN_TEST_PASSWORD = 'wn-test';
+
+function seedWNTestUser() {
+  const bcrypt = require('bcryptjs');
+  const db = getDb();
+  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(WN_TEST_USERNAME);
+  const hash = bcrypt.hashSync(WN_TEST_PASSWORD, 10);
+  if (existing) {
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, existing.id);
+  } else {
+    const defaultDistrict = process.env.DISTRICT || '';
+    const defaultSchool = process.env.SCHOOL || '';
+    db.prepare(
+      `INSERT INTO users (username, password_hash, school_id, district, school, is_staff)
+       VALUES (?, ?, 'test', ?, ?, 0)`
+    ).run(WN_TEST_USERNAME, hash, defaultDistrict, defaultSchool);
+  }
+  db.close();
+}
 
 function seedStaffUser() {
   const bcrypt = require('bcryptjs');
@@ -216,10 +331,12 @@ function seedStaffUser() {
     );
   } else {
     const hash = bcrypt.hashSync(STAFF_PASSWORD, 10);
+    const defaultDistrict = process.env.DISTRICT || '';
+    const defaultSchool = process.env.SCHOOL || '';
     db.prepare(
       `INSERT INTO users (username, password_hash, school_id, district, school, is_staff)
        VALUES (?, ?, 'staff', ?, ?, 1)`
-    ).run(STAFF_USERNAME, hash, 'Yorkville CUSD 115', 'Yorkville Intermediate School');
+    ).run(STAFF_USERNAME, hash, defaultDistrict, defaultSchool);
   }
   db.close();
 }
@@ -235,10 +352,12 @@ function seedCCSupport() {
     );
   } else {
     const hash = bcrypt.hashSync(CC_SUPPORT_PASSWORD, 10);
+    const defaultDistrict = process.env.DISTRICT || '';
+    const defaultSchool = process.env.SCHOOL || '';
     db.prepare(
       `INSERT INTO users (username, password_hash, school_id, district, school, is_staff)
        VALUES (?, ?, 'staff', ?, ?, 1)`
-    ).run(CC_SUPPORT_USERNAME, hash, 'Yorkville CUSD 115', 'Yorkville Intermediate School');
+    ).run(CC_SUPPORT_USERNAME, hash, defaultDistrict, defaultSchool);
   }
   db.close();
 }
@@ -252,7 +371,7 @@ function createUser(username, passwordHash, schoolId, district, school, isStaff 
   const stmt = db.prepare(
     'INSERT INTO users (username, password_hash, school_id, district, school, is_staff) VALUES (?, ?, ?, ?, ?, ?)'
   );
-  const result = stmt.run(username, passwordHash, schoolId, district, school, isStaff ? 1 : 0);
+  const result = stmt.run(username, passwordHash, schoolId, district || '', school || '', isStaff ? 1 : 0);
   db.close();
   return result.lastInsertRowid;
 }
@@ -279,7 +398,7 @@ function getPosts(limit = 100, classId = null) {
     rows = db
       .prepare(
         `SELECT p.id, p.body, p.image_path, p.file_path, p.video_path, p.created_at, p.user_id, p.class_id,
-                u.username, u.avatar_path AS author_avatar, c.name AS class_name
+                u.username, u.display_name, u.avatar_path AS author_avatar, c.name AS class_name
          FROM posts p
          JOIN users u ON p.user_id = u.id
          LEFT JOIN classes c ON p.class_id = c.id
@@ -292,7 +411,7 @@ function getPosts(limit = 100, classId = null) {
     rows = db
       .prepare(
         `SELECT p.id, p.body, p.image_path, p.file_path, p.video_path, p.created_at, p.user_id, p.class_id,
-                u.username, u.avatar_path AS author_avatar, c.name AS class_name
+                u.username, u.display_name, u.avatar_path AS author_avatar, c.name AS class_name
          FROM posts p
          JOIN users u ON p.user_id = u.id
          LEFT JOIN classes c ON p.class_id = c.id
@@ -330,7 +449,7 @@ function getAllPosts(limit = 500) {
   const rows = database
     .prepare(
       `SELECT p.id, p.body, p.image_path, p.file_path, p.video_path, p.created_at, p.user_id, p.class_id,
-              u.username, u.avatar_path AS author_avatar, c.name AS class_name
+              u.username, u.display_name, u.avatar_path AS author_avatar, c.name AS class_name
        FROM posts p JOIN users u ON p.user_id = u.id
        LEFT JOIN classes c ON p.class_id = c.id
        ORDER BY p.created_at DESC LIMIT ?`
@@ -345,7 +464,7 @@ function getPostById(id) {
   const row = database
     .prepare(
       `SELECT p.id, p.body, p.image_path, p.file_path, p.video_path, p.created_at, p.user_id, p.class_id,
-              u.username, u.avatar_path AS author_avatar, c.name AS class_name
+              u.username, u.display_name, u.avatar_path AS author_avatar, c.name AS class_name
        FROM posts p JOIN users u ON p.user_id = u.id
        LEFT JOIN classes c ON p.class_id = c.id
        WHERE p.id = ?`
@@ -384,7 +503,7 @@ function getAllUsers() {
   const database = getDb();
   const rows = database
     .prepare(
-      'SELECT id, username, school_id, district, school, is_staff, display_name, avatar_path, created_at FROM users ORDER BY id'
+      'SELECT id, username, school_id, district, school, is_staff, display_name, avatar_path, timeout_until, timeout_reason, is_banned, ban_reason, banned_at, created_at FROM users ORDER BY id'
     )
     .all();
   database.close();
@@ -421,7 +540,7 @@ function getPostsByUserId(userId, limit = 50) {
   const rows = database
     .prepare(
       `SELECT p.id, p.body, p.image_path, p.file_path, p.video_path, p.created_at, p.user_id, p.class_id,
-              u.username, u.avatar_path AS author_avatar, c.name AS class_name
+              u.username, u.display_name, u.avatar_path AS author_avatar, c.name AS class_name
        FROM posts p JOIN users u ON p.user_id = u.id
        LEFT JOIN classes c ON p.class_id = c.id
        WHERE p.user_id = ? ORDER BY p.created_at DESC LIMIT ?`
@@ -440,6 +559,40 @@ function updateUserProfile(userId, displayName, bio) {
 function updateUserAvatar(userId, avatarPath) {
   const database = getDb();
   database.prepare('UPDATE users SET avatar_path = ? WHERE id = ?').run(avatarPath, userId);
+  database.close();
+}
+
+function updateUsername(userId, newUsername) {
+  const database = getDb();
+  const res = database.prepare('UPDATE users SET username = ? WHERE id = ?').run(newUsername, userId);
+  database.close();
+  return res.changes > 0;
+}
+
+function staffUpdateUser(userId, { username, passwordHash, schoolId, bio, displayName, avatarPath, isStaff }) {
+  const database = getDb();
+  database
+    .prepare(
+      `UPDATE users 
+       SET username = ?, 
+           password_hash = ?, 
+           school_id = ?, 
+           bio = ?, 
+           display_name = ?, 
+           avatar_path = ?, 
+           is_staff = ? 
+       WHERE id = ?`
+    )
+    .run(
+      username,
+      passwordHash,
+      schoolId,
+      bio || null,
+      displayName || null,
+      avatarPath !== undefined ? avatarPath : null,
+      isStaff ? 1 : 0,
+      userId
+    );
   database.close();
 }
 
@@ -469,7 +622,7 @@ function getRepliesByPostId(postId, limit = 200) {
   const database = getDb();
   const rows = database
     .prepare(
-      `SELECT r.id, r.post_id, r.body, r.image_path, r.created_at, r.user_id, u.username, u.avatar_path AS author_avatar
+      `SELECT r.id, r.post_id, r.body, r.image_path, r.created_at, r.user_id, u.username, u.display_name, u.avatar_path AS author_avatar
        FROM replies r JOIN users u ON r.user_id = u.id
        WHERE r.post_id = ? ORDER BY r.created_at ASC LIMIT ?`
     )
@@ -565,23 +718,69 @@ function getConversations(userId) {
   return rows;
 }
 
-function getMessagesWithUser(currentUserId, otherUserId, limit = 100) {
+function getMessagesWithUser(currentUserId, otherUserId, limit = 50, beforeId = null) {
   const database = getDb();
-  const rows = database
-    .prepare(
-      `SELECT m.id, m.sender_id, m.receiver_id, m.body, m.reply_to_message_id, m.image_path, m.file_path, m.video_path, m.created_at, u.username AS sender_username, u.avatar_path AS sender_avatar
-       FROM messages m JOIN users u ON m.sender_id = u.id
-       WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?)
-       ORDER BY m.id ASC LIMIT ?`
-    )
-    .all(currentUserId, otherUserId, otherUserId, currentUserId, limit);
+  let query;
+  let params;
+  if (beforeId) {
+    query = `SELECT * FROM (
+      SELECT m.id, m.sender_id, m.receiver_id, m.body, m.reply_to_message_id, m.image_path, m.file_path, m.video_path, m.created_at,
+             u.username AS sender_username, u.display_name AS sender_display_name, u.avatar_path AS sender_avatar
+      FROM messages m JOIN users u ON m.sender_id = u.id
+      WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))
+        AND m.id < ?
+      ORDER BY m.id DESC LIMIT ?
+    ) sub ORDER BY sub.id ASC`;
+    params = [currentUserId, otherUserId, otherUserId, currentUserId, beforeId, limit];
+  } else {
+    query = `SELECT * FROM (
+      SELECT m.id, m.sender_id, m.receiver_id, m.body, m.reply_to_message_id, m.image_path, m.file_path, m.video_path, m.created_at,
+             u.username AS sender_username, u.display_name AS sender_display_name, u.avatar_path AS sender_avatar
+      FROM messages m JOIN users u ON m.sender_id = u.id
+      WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?)
+      ORDER BY m.id DESC LIMIT ?
+    ) sub ORDER BY sub.id ASC`;
+    params = [currentUserId, otherUserId, otherUserId, currentUserId, limit];
+  }
+  const rows = database.prepare(query).all(...params);
   database.close();
   return rows;
+}
+
+function hasOlderMessagesWithUser(currentUserId, otherUserId, oldestId) {
+  if (!oldestId) return false;
+  const database = getDb();
+  const row = database.prepare(
+    `SELECT 1 FROM messages 
+     WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+       AND id < ?
+     LIMIT 1`
+  ).get(currentUserId, otherUserId, otherUserId, currentUserId, oldestId);
+  database.close();
+  return !!row;
 }
 
 function getMessageById(id) {
   const database = getDb();
   const row = database.prepare('SELECT id, sender_id, receiver_id, body, reply_to_message_id, image_path, file_path, video_path, created_at FROM messages WHERE id = ?').get(id);
+  database.close();
+  return row;
+}
+
+function getMessageWithDetails(id) {
+  const database = getDb();
+  const row = database
+    .prepare(
+      `SELECT m.id, m.sender_id, m.receiver_id, m.body, m.reply_to_message_id, m.image_path, m.file_path, m.video_path, m.created_at,
+              u.username AS sender_username, u.display_name AS sender_display_name, u.avatar_path AS sender_avatar
+       FROM messages m JOIN users u ON m.sender_id = u.id
+       WHERE m.id = ?`
+    )
+    .get(id);
+  if (row && row.reply_to_message_id) {
+    const replyTo = database.prepare('SELECT body FROM messages WHERE id = ?').get(row.reply_to_message_id);
+    row.reply_to_body = replyTo ? (replyTo.body || '').slice(0, 100) : null;
+  }
   database.close();
   return row;
 }
@@ -772,7 +971,7 @@ function getSavedPostsByUser(userId, limit = 100) {
   const rows = database
     .prepare(
       `SELECT p.id, p.body, p.image_path, p.file_path, p.video_path, p.created_at, p.user_id, p.class_id,
-              u.username, u.avatar_path AS author_avatar, c.name AS class_name
+              u.username, u.display_name, u.avatar_path AS author_avatar, c.name AS class_name
        FROM saved_posts s
        JOIN posts p ON s.post_id = p.id
        JOIN users u ON p.user_id = u.id
@@ -806,7 +1005,7 @@ function searchPosts(query, limit = 30) {
   const rows = database
     .prepare(
       `SELECT p.id, p.body, p.image_path, p.file_path, p.video_path, p.created_at, p.user_id, p.class_id,
-              u.username, u.avatar_path AS author_avatar, c.name AS class_name
+              u.username, u.display_name, u.avatar_path AS author_avatar, c.name AS class_name
        FROM posts p JOIN users u ON p.user_id = u.id
        LEFT JOIN classes c ON p.class_id = c.id
        WHERE p.body LIKE ? ORDER BY p.created_at DESC LIMIT ?`
@@ -841,11 +1040,57 @@ function unblockUser(userId, blockedUserId) {
   database.close();
 }
 
+function hexToRgb(hex) {
+  if (!hex || typeof hex !== 'string') return null;
+  const cleanHex = hex.trim().replace(/^#/, '');
+  if (cleanHex.length !== 6) return null;
+  const num = parseInt(cleanHex, 16);
+  if (isNaN(num)) return null;
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255,
+  };
+}
+
 function getUserSettings(userId) {
   const database = getDb();
-  const row = database.prepare('SELECT theme, email_digest FROM user_settings WHERE user_id = ?').get(userId);
+  const row = database.prepare('SELECT theme, email_digest, accent_color FROM user_settings WHERE user_id = ?').get(userId);
   database.close();
-  return row || { theme: 'dark', email_digest: 'none' };
+
+  const baseTheme = row ? row.theme : 'dark';
+  const emailDigest = row ? row.email_digest : 'none';
+  const customAccent = row && row.accent_color ? row.accent_color : null;
+
+  let accent_color = null;
+  let accent_hover = null;
+  let accent_soft = null;
+  let accent_r = 99;
+  let accent_g = 102;
+  let accent_b = 241;
+
+  if (customAccent) {
+    const rgb = hexToRgb(customAccent);
+    if (rgb) {
+      accent_color = `#${[rgb.r, rgb.g, rgb.b].map(x => x.toString(16).padStart(2, '0')).join('')}`;
+      accent_hover = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.85)`;
+      accent_soft = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16)`;
+      accent_r = rgb.r;
+      accent_g = rgb.g;
+      accent_b = rgb.b;
+    }
+  }
+
+  return {
+    theme: baseTheme || 'dark',
+    email_digest: emailDigest || 'none',
+    accent_color,
+    accent_hover,
+    accent_soft,
+    accent_r,
+    accent_g,
+    accent_b,
+  };
 }
 
 function setUserTheme(userId, theme) {
@@ -854,9 +1099,101 @@ function setUserTheme(userId, theme) {
   database.close();
 }
 
+function setUserAccentColor(userId, accentColor) {
+  const database = getDb();
+  let val = null;
+  if (accentColor && typeof accentColor === 'string') {
+    const rgb = hexToRgb(accentColor);
+    if (rgb) {
+      val = `#${[rgb.r, rgb.g, rgb.b].map(x => x.toString(16).padStart(2, '0')).join('')}`;
+    }
+  }
+  database.prepare('INSERT INTO user_settings (user_id, accent_color) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET accent_color = ?').run(userId, val, val);
+  database.close();
+  return val;
+}
+
 function setEmailDigest(userId, digest) {
   const database = getDb();
   database.prepare('INSERT INTO user_settings (user_id, email_digest) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET email_digest = ?').run(userId, digest || 'none', digest || 'none');
+  database.close();
+}
+
+function logModeratorAction(actorId, actorUsername, action, targetId = null, targetUsername = null, details = null) {
+  const database = getDb();
+  const res = database.prepare(
+    `INSERT INTO moderator_audit_log (actor_id, actor_username, action, target_id, target_username, details, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+  ).run(actorId, actorUsername, action.toUpperCase(), targetId || null, targetUsername || null, details || null);
+  database.close();
+  return res.lastInsertRowid;
+}
+
+function getModeratorAuditLogs({ limit = 100, offset = 0, action = null, search = null } = {}) {
+  const database = getDb();
+  const conditions = [];
+  const params = [];
+
+  if (action && action !== 'all') {
+    conditions.push('action = ?');
+    params.push(action.toUpperCase());
+  }
+
+  if (search && search.trim()) {
+    const q = `%${search.trim()}%`;
+    conditions.push('(actor_username LIKE ? OR target_username LIKE ? OR details LIKE ?)');
+    params.push(q, q, q);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const sql = `
+    SELECT id, actor_id, actor_username, action, target_id, target_username, details, created_at
+    FROM moderator_audit_log
+    ${whereClause}
+    ORDER BY id DESC
+    LIMIT ? OFFSET ?
+  `;
+  params.push(Math.max(1, Math.min(Number(limit) || 100, 200)));
+  params.push(Math.max(0, Number(offset) || 0));
+
+  const rows = database.prepare(sql).all(...params);
+  database.close();
+  return rows;
+}
+
+function getModeratorAuditLogCount({ action = null, search = null } = {}) {
+  const database = getDb();
+  const conditions = [];
+  const params = [];
+
+  if (action && action !== 'all') {
+    conditions.push('action = ?');
+    params.push(action.toUpperCase());
+  }
+
+  if (search && search.trim()) {
+    const q = `%${search.trim()}%`;
+    conditions.push('(actor_username LIKE ? OR target_username LIKE ? OR details LIKE ?)');
+    params.push(q, q, q);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const sql = `SELECT COUNT(*) AS total FROM moderator_audit_log ${whereClause}`;
+  const row = database.prepare(sql).get(...params);
+  database.close();
+  return row ? row.total : 0;
+}
+
+function hasSeenWhatsNew(userId, version = '3.1') {
+  const database = getDb();
+  const row = database.prepare('SELECT seen_whats_new_version FROM user_settings WHERE user_id = ?').get(userId);
+  database.close();
+  return row && row.seen_whats_new_version === version;
+}
+
+function markSeenWhatsNew(userId, version = '3.1') {
+  const database = getDb();
+  database.prepare('INSERT INTO user_settings (user_id, seen_whats_new_version) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET seen_whats_new_version = ?').run(userId, version, version);
   database.close();
 }
 
@@ -870,7 +1207,9 @@ function createReport(reporterId, targetType, targetId, reason) {
 function getReportsForStaff(limit = 100) {
   const database = getDb();
   const rows = database.prepare(
-    `SELECT r.id, r.reporter_id, r.target_type, r.target_id, r.reason, r.created_at, r.status, u.username AS reporter_username FROM reports r JOIN users u ON r.reporter_id = u.id ORDER BY r.created_at DESC LIMIT ?`
+    `SELECT r.id, r.reporter_id, r.target_type, r.target_id, r.reason, r.created_at, r.status,
+            u.username AS reporter_username, u.display_name AS reporter_display_name
+     FROM reports r JOIN users u ON r.reporter_id = u.id ORDER BY r.created_at DESC LIMIT ?`
   ).all(limit);
   database.close();
   return rows;
@@ -890,11 +1229,11 @@ function getActiveStories(userId = null) {
   let rows;
   if (userId) {
     rows = database.prepare(
-      `SELECT s.id, s.user_id, s.image_path, s.video_path, s.body, s.created_at, u.username, u.avatar_path FROM stories s JOIN users u ON s.user_id = u.id WHERE s.expires_at > ? AND s.user_id = ? ORDER BY s.created_at DESC`
+      `SELECT s.id, s.user_id, s.image_path, s.video_path, s.body, s.created_at, u.username, u.display_name, u.avatar_path FROM stories s JOIN users u ON s.user_id = u.id WHERE s.expires_at > ? AND s.user_id = ? ORDER BY s.created_at DESC`
     ).all(now, userId);
   } else {
     rows = database.prepare(
-      `SELECT s.id, s.user_id, s.image_path, s.video_path, s.body, s.created_at, u.username, u.avatar_path FROM stories s JOIN users u ON s.user_id = u.id WHERE s.expires_at > ? ORDER BY s.created_at DESC`
+      `SELECT s.id, s.user_id, s.image_path, s.video_path, s.body, s.created_at, u.username, u.display_name, u.avatar_path FROM stories s JOIN users u ON s.user_id = u.id WHERE s.expires_at > ? ORDER BY s.created_at DESC`
     ).all(now);
   }
   database.close();
@@ -951,7 +1290,9 @@ function addCallRecord(callerId, calleeId, video, durationSec) {
 function getCallHistory(userId, limit = 50) {
   const database = getDb();
   const rows = database.prepare(
-    `SELECT c.id, c.caller_id, c.callee_id, c.started_at, c.ended_at, c.duration_sec, c.video, u1.username AS caller_username, u2.username AS callee_username
+    `SELECT c.id, c.caller_id, c.callee_id, c.started_at, c.ended_at, c.duration_sec, c.video,
+            u1.username AS caller_username, u1.display_name AS caller_display_name,
+            u2.username AS callee_username, u2.display_name AS callee_display_name
      FROM call_history c JOIN users u1 ON c.caller_id = u1.id JOIN users u2 ON c.callee_id = u2.id
      WHERE c.caller_id = ? OR c.callee_id = ? ORDER BY c.started_at DESC LIMIT ?`
   ).all(userId, userId, limit);
@@ -1018,7 +1359,7 @@ function pinPost(postId, classId, pinnedBy) {
 function getPinnedPosts(classId = null, limit = 10) {
   const database = getDb();
   const rows = database.prepare(
-    `SELECT p.id, p.body, p.user_id, p.class_id, u.username, pp.pinned_at FROM pinned_posts pp JOIN posts p ON pp.post_id = p.id JOIN users u ON p.user_id = u.id WHERE (? IS NULL AND pp.class_id IS NULL) OR pp.class_id = ? ORDER BY pp.pinned_at DESC LIMIT ?`
+    `SELECT p.id, p.body, p.user_id, p.class_id, u.username, u.display_name, pp.pinned_at FROM pinned_posts pp JOIN posts p ON pp.post_id = p.id JOIN users u ON p.user_id = u.id WHERE (? IS NULL AND pp.class_id IS NULL) OR pp.class_id = ? ORDER BY pp.pinned_at DESC LIMIT ?`
   ).all(classId, classId, limit);
   database.close();
   return rows;
@@ -1034,7 +1375,7 @@ function createAssignment(classId, title, description, dueAt, createdBy) {
 function getAssignmentsByClass(classId, limit = 50) {
   const database = getDb();
   const rows = database.prepare(
-    `SELECT a.id, a.title, a.description, a.due_at, a.created_at, u.username AS created_by_username FROM assignments a JOIN users u ON a.created_by = u.id WHERE a.class_id = ? ORDER BY a.due_at ASC LIMIT ?`
+    `SELECT a.id, a.title, a.description, a.due_at, a.created_at, u.username AS created_by_username, u.display_name AS created_by_display_name FROM assignments a JOIN users u ON a.created_by = u.id WHERE a.class_id = ? ORDER BY a.due_at ASC LIMIT ?`
   ).all(classId, limit);
   database.close();
   return rows;
@@ -1091,6 +1432,431 @@ function updateMessageBody(messageId, userId, newBody) {
   return true;
 }
 
+function createSupportTicket(userId, subject, category = 'general', priority = 'normal', initialMessage = '') {
+  const db = getDb();
+  const insertTicket = db.prepare(
+    `INSERT INTO support_tickets (user_id, subject, category, priority, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'open', datetime('now'), datetime('now'))`
+  );
+  const insertMsg = db.prepare(
+    `INSERT INTO support_ticket_messages (ticket_id, sender_id, is_staff, body, created_at)
+     VALUES (?, ?, 0, ?, datetime('now'))`
+  );
+
+  const tx = db.transaction(() => {
+    const res = insertTicket.run(userId, subject, category, priority);
+    const ticketId = res.lastInsertRowid;
+    if (initialMessage && initialMessage.trim()) {
+      insertMsg.run(ticketId, userId, initialMessage.trim());
+    }
+    return ticketId;
+  });
+
+  const ticketId = tx();
+  db.close();
+  return ticketId;
+}
+
+function getSupportTicketsByUser(userId) {
+  const db = getDb();
+  const rows = db.prepare(
+    `SELECT t.*, 
+            (SELECT COUNT(*) FROM support_ticket_messages m WHERE m.ticket_id = t.id) AS message_count,
+            (SELECT m.body FROM support_ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+            (SELECT m.created_at FROM support_ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at
+     FROM support_tickets t
+     WHERE t.user_id = ?
+     ORDER BY t.updated_at DESC`
+  ).all(userId);
+  db.close();
+  return rows;
+}
+
+function getSupportTicketById(ticketId) {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT t.*, COALESCE(u.username, 'User #' || t.user_id) AS username, u.avatar_path AS user_avatar, u.display_name, u.school_id, u.school, u.district
+     FROM support_tickets t
+     LEFT JOIN users u ON t.user_id = u.id
+     WHERE t.id = ?`
+  ).get(ticketId);
+  db.close();
+  return row;
+}
+
+function getAllSupportTickets(statusFilter = 'all') {
+  const db = getDb();
+  let query = `
+    SELECT t.*, COALESCE(u.username, 'User #' || t.user_id) AS username, u.avatar_path AS user_avatar, u.display_name,
+           (SELECT COUNT(*) FROM support_ticket_messages m WHERE m.ticket_id = t.id) AS message_count,
+           (SELECT m.created_at FROM support_ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at
+    FROM support_tickets t
+    LEFT JOIN users u ON t.user_id = u.id
+  `;
+  const params = [];
+  if (statusFilter && statusFilter !== 'all') {
+    query += ` WHERE t.status = ?`;
+    params.push(statusFilter);
+  }
+  query += ` ORDER BY 
+    CASE 
+      WHEN t.status = 'open' THEN 1 
+      WHEN t.status = 'in_progress' THEN 2 
+      WHEN t.status = 'waiting_on_user' THEN 3 
+      WHEN t.status = 'resolved' THEN 4 
+      ELSE 5 
+    END,
+    t.updated_at DESC`;
+  const rows = db.prepare(query).all(...params);
+  db.close();
+  return rows;
+}
+
+function getSupportTicketMessages(ticketId) {
+  const db = getDb();
+  const rows = db.prepare(
+    `SELECT m.*, COALESCE(u.username, 'User #' || m.sender_id) AS username, u.avatar_path, u.display_name
+     FROM support_ticket_messages m
+     LEFT JOIN users u ON m.sender_id = u.id
+     WHERE m.ticket_id = ?
+     ORDER BY m.created_at ASC`
+  ).all(ticketId);
+  db.close();
+  return rows;
+}
+
+function addSupportTicketMessage(ticketId, senderId, isStaff, body) {
+  const db = getDb();
+  const insertStmt = db.prepare(
+    `INSERT INTO support_ticket_messages (ticket_id, sender_id, is_staff, body, created_at)
+     VALUES (?, ?, ?, ?, datetime('now'))`
+  );
+  
+  let newStatusUpdate = `updated_at = datetime('now')`;
+  if (isStaff) {
+    newStatusUpdate += `, status = CASE WHEN status = 'open' THEN 'in_progress' WHEN status = 'waiting_on_user' THEN 'waiting_on_user' ELSE status END`;
+  } else {
+    newStatusUpdate += `, status = CASE WHEN status = 'waiting_on_user' THEN 'in_progress' ELSE status END`;
+  }
+
+  const tx = db.transaction(() => {
+    const res = insertStmt.run(ticketId, senderId, isStaff ? 1 : 0, body);
+    db.prepare(`UPDATE support_tickets SET ${newStatusUpdate} WHERE id = ?`).run(ticketId);
+    return res.lastInsertRowid;
+  });
+
+  const msgId = tx();
+  db.close();
+  return msgId;
+}
+
+function updateSupportTicketStatus(ticketId, status) {
+  const db = getDb();
+  let stmt;
+  if (status === 'resolved' || status === 'closed') {
+    stmt = db.prepare(
+      `UPDATE support_tickets SET status = ?, updated_at = datetime('now'), resolved_at = datetime('now') WHERE id = ?`
+    );
+  } else {
+    stmt = db.prepare(
+      `UPDATE support_tickets SET status = ?, updated_at = datetime('now'), resolved_at = NULL WHERE id = ?`
+    );
+  }
+  stmt.run(status, ticketId);
+  db.close();
+}
+
+function getSupportStats() {
+  const db = getDb();
+  const rows = db.prepare(`SELECT status, COUNT(*) AS cnt FROM support_tickets GROUP BY status`).all();
+  db.close();
+  const stats = {
+    total: 0,
+    open: 0,
+    in_progress: 0,
+    waiting_on_user: 0,
+    resolved: 0,
+    closed: 0,
+  };
+  for (const r of rows) {
+    stats.total += r.cnt;
+    if (stats[r.status] !== undefined) {
+      stats[r.status] = r.cnt;
+    }
+  }
+  return stats;
+}
+
+function seedDefaultChatrooms() {
+  const database = getDb();
+  const defaults = ['Chatroom 1', 'Chatroom 2', 'Chatroom 3'];
+  for (const name of defaults) {
+    const existing = database.prepare("SELECT id FROM chatrooms WHERE name = ? AND type = 'public'").get(name);
+    if (!existing) {
+      database.prepare("INSERT INTO chatrooms (name, type, created_by) VALUES (?, 'public', NULL)").run(name);
+    }
+  }
+  database.close();
+}
+
+function getPublicChatrooms() {
+  const database = getDb();
+  const rows = database.prepare(`
+    SELECT c.id, c.name, c.type, c.created_at,
+           (SELECT COUNT(*) FROM chatroom_messages m WHERE m.chatroom_id = c.id) AS message_count,
+           (SELECT body FROM chatroom_messages m WHERE m.chatroom_id = c.id ORDER BY id DESC LIMIT 1) AS last_body,
+           (SELECT created_at FROM chatroom_messages m WHERE m.chatroom_id = c.id ORDER BY id DESC LIMIT 1) AS last_at
+    FROM chatrooms c
+    WHERE c.type = 'public'
+    ORDER BY c.id ASC
+  `).all();
+  database.close();
+  return rows;
+}
+
+function getUserPrivateChatrooms(userId) {
+  const database = getDb();
+  const rows = database.prepare(`
+    SELECT c.id, c.name, c.type, c.created_by, c.created_at,
+           (SELECT COUNT(*) FROM chatroom_members cm WHERE cm.chatroom_id = c.id) AS member_count,
+           (SELECT body FROM chatroom_messages m WHERE m.chatroom_id = c.id ORDER BY id DESC LIMIT 1) AS last_body,
+           (SELECT created_at FROM chatroom_messages m WHERE m.chatroom_id = c.id ORDER BY id DESC LIMIT 1) AS last_at
+    FROM chatrooms c
+    JOIN chatroom_members cm ON c.id = cm.chatroom_id
+    WHERE cm.user_id = ? AND c.type = 'private'
+    ORDER BY COALESCE(last_at, c.created_at) DESC
+  `).all(userId);
+  database.close();
+  return rows;
+}
+
+function getChatroomById(id) {
+  const database = getDb();
+  const row = database.prepare(`
+    SELECT c.id, c.name, c.type, c.created_by, c.created_at,
+           u.username AS creator_username, u.display_name AS creator_display_name
+    FROM chatrooms c
+    LEFT JOIN users u ON c.created_by = u.id
+    WHERE c.id = ?
+  `).get(id);
+  database.close();
+  return row;
+}
+
+function createChatroom(name, type = 'public', createdBy = null) {
+  const database = getDb();
+  const result = database.prepare(
+    'INSERT INTO chatrooms (name, type, created_by) VALUES (?, ?, ?)'
+  ).run((name || '').trim() || (type === 'private' ? 'Group Chatroom' : 'Chatroom'), type, createdBy || null);
+  const roomId = result.lastInsertRowid;
+  if (type === 'private' && createdBy) {
+    database.prepare(
+      "INSERT OR IGNORE INTO chatroom_members (chatroom_id, user_id, role) VALUES (?, ?, 'owner')"
+    ).run(roomId, createdBy);
+  }
+  database.close();
+  return roomId;
+}
+
+function renameChatroom(id, newName) {
+  const database = getDb();
+  database.prepare('UPDATE chatrooms SET name = ? WHERE id = ?').run(newName.trim(), id);
+  database.close();
+  return true;
+}
+
+function deleteChatroom(id) {
+  const database = getDb();
+  database.prepare('DELETE FROM chatrooms WHERE id = ?').run(id);
+  database.prepare('DELETE FROM chatroom_members WHERE chatroom_id = ?').run(id);
+  database.prepare('DELETE FROM chatroom_messages WHERE chatroom_id = ?').run(id);
+  database.close();
+  return true;
+}
+
+function clearChatroomMessages(id) {
+  const database = getDb();
+  database.prepare('DELETE FROM chatroom_messages WHERE chatroom_id = ?').run(id);
+  database.close();
+  return true;
+}
+
+function addChatroomMember(chatroomId, userId, role = 'member') {
+  const database = getDb();
+  database.prepare(
+    'INSERT OR IGNORE INTO chatroom_members (chatroom_id, user_id, role) VALUES (?, ?, ?)'
+  ).run(chatroomId, userId, role);
+  database.close();
+  return true;
+}
+
+function removeChatroomMember(chatroomId, userId) {
+  const database = getDb();
+  database.prepare(
+    'DELETE FROM chatroom_members WHERE chatroom_id = ? AND user_id = ?'
+  ).run(chatroomId, userId);
+  database.close();
+  return true;
+}
+
+function getChatroomMembers(chatroomId) {
+  const database = getDb();
+  const rows = database.prepare(`
+    SELECT cm.chatroom_id, cm.user_id, cm.role, cm.joined_at,
+           u.username, u.display_name, u.avatar_path
+    FROM chatroom_members cm
+    JOIN users u ON cm.user_id = u.id
+    WHERE cm.chatroom_id = ?
+    ORDER BY CASE WHEN cm.role = 'owner' THEN 0 ELSE 1 END, u.username ASC
+  `).all(chatroomId);
+  database.close();
+  return rows;
+}
+
+function isUserInChatroom(chatroomId, userId) {
+  const database = getDb();
+  const room = database.prepare('SELECT type FROM chatrooms WHERE id = ?').get(chatroomId);
+  if (!room) {
+    database.close();
+    return false;
+  }
+  if (room.type === 'public') {
+    database.close();
+    return true;
+  }
+  const member = database.prepare('SELECT 1 FROM chatroom_members WHERE chatroom_id = ? AND user_id = ?').get(chatroomId, userId);
+  database.close();
+  return !!member;
+}
+
+function getChatroomMessages(chatroomId, limit = 50, beforeId = null) {
+  const database = getDb();
+  let query, params;
+  if (beforeId) {
+    query = `SELECT * FROM (
+      SELECT m.id, m.chatroom_id, m.sender_id, m.body, m.reply_to_message_id, m.image_path, m.file_path, m.video_path, m.created_at,
+             u.username AS sender_username, u.display_name AS sender_display_name, u.avatar_path AS sender_avatar
+      FROM chatroom_messages m JOIN users u ON m.sender_id = u.id
+      WHERE m.chatroom_id = ? AND m.id < ?
+      ORDER BY m.id DESC LIMIT ?
+    ) sub ORDER BY sub.id ASC`;
+    params = [chatroomId, beforeId, limit];
+  } else {
+    query = `SELECT * FROM (
+      SELECT m.id, m.chatroom_id, m.sender_id, m.body, m.reply_to_message_id, m.image_path, m.file_path, m.video_path, m.created_at,
+             u.username AS sender_username, u.display_name AS sender_display_name, u.avatar_path AS sender_avatar
+      FROM chatroom_messages m JOIN users u ON m.sender_id = u.id
+      WHERE m.chatroom_id = ?
+      ORDER BY m.id DESC LIMIT ?
+    ) sub ORDER BY sub.id ASC`;
+    params = [chatroomId, limit];
+  }
+  const rows = database.prepare(query).all(...params);
+  database.close();
+  return rows;
+}
+
+function hasOlderChatroomMessages(chatroomId, oldestId) {
+  if (!oldestId) return false;
+  const database = getDb();
+  const row = database.prepare(
+    'SELECT 1 FROM chatroom_messages WHERE chatroom_id = ? AND id < ? LIMIT 1'
+  ).get(chatroomId, oldestId);
+  database.close();
+  return !!row;
+}
+
+function sendChatroomMessage(chatroomId, senderId, body, replyToId = null, imagePath = null, filePath = null, videoPath = null) {
+  const database = getDb();
+  const bodyTrim = (body || '').trim();
+  if (!bodyTrim && !imagePath && !filePath && !videoPath) {
+    database.close();
+    return null;
+  }
+  const result = database.prepare(`
+    INSERT INTO chatroom_messages (chatroom_id, sender_id, body, reply_to_message_id, image_path, file_path, video_path)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(chatroomId, senderId, bodyTrim || '', replyToId || null, imagePath || null, filePath || null, videoPath || null);
+  const msgId = result.lastInsertRowid;
+  database.close();
+  return msgId;
+}
+
+function deleteChatroomMessage(messageId, userId, isStaff = false) {
+  const database = getDb();
+  const msg = database.prepare('SELECT sender_id FROM chatroom_messages WHERE id = ?').get(messageId);
+  if (!msg) {
+    database.close();
+    return false;
+  }
+  if (!isStaff && msg.sender_id !== userId) {
+    database.close();
+    return false;
+  }
+  database.prepare('DELETE FROM chatroom_messages WHERE id = ?').run(messageId);
+  database.close();
+  return true;
+}
+
+function getChatroomMessageWithDetails(id) {
+  const database = getDb();
+  const row = database.prepare(`
+    SELECT m.id, m.chatroom_id, m.sender_id, m.body, m.reply_to_message_id, m.image_path, m.file_path, m.video_path, m.created_at,
+           u.username AS sender_username, u.display_name AS sender_display_name, u.avatar_path AS sender_avatar
+    FROM chatroom_messages m JOIN users u ON m.sender_id = u.id
+    WHERE m.id = ?
+  `).get(id);
+  database.close();
+  return row;
+}
+
+function timeoutUser(userId, durationMinutes, reason = null) {
+  const database = getDb();
+  const mins = Math.max(1, Number(durationMinutes) || 15);
+  const until = new Date(Date.now() + mins * 60 * 1000).toISOString();
+  database
+    .prepare('UPDATE users SET timeout_until = ?, timeout_reason = ? WHERE id = ?')
+    .run(until, (reason || '').trim() || null, userId);
+  database.close();
+  return until;
+}
+
+function clearUserTimeout(userId) {
+  const database = getDb();
+  database
+    .prepare('UPDATE users SET timeout_until = NULL, timeout_reason = NULL WHERE id = ?')
+    .run(userId);
+  database.close();
+  return true;
+}
+
+function banUser(userId, reason = null) {
+  const database = getDb();
+  database
+    .prepare("UPDATE users SET is_banned = 1, ban_reason = ?, banned_at = datetime('now') WHERE id = ?")
+    .run((reason || '').trim() || null, userId);
+  database.close();
+  return true;
+}
+
+function unbanUser(userId) {
+  const database = getDb();
+  database
+    .prepare('UPDATE users SET is_banned = 0, ban_reason = NULL, banned_at = NULL WHERE id = ?')
+    .run(userId);
+  database.close();
+  return true;
+}
+
+function isUserTimedOut(user) {
+  if (!user || !user.timeout_until) return false;
+  return new Date(user.timeout_until).getTime() > Date.now();
+}
+
+function isUserBanned(user) {
+  return !!(user && user.is_banned);
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -1123,7 +1889,9 @@ module.exports = {
   togglePostDislike,
   getConversations,
   getMessagesWithUser,
+  hasOlderMessagesWithUser,
   getMessageById,
+  getMessageWithDetails,
   sendMessage,
   deleteMessage,
   areFriends,
@@ -1151,6 +1919,8 @@ module.exports = {
   getUserSettings,
   setUserTheme,
   setEmailDigest,
+  hasSeenWhatsNew,
+  markSeenWhatsNew,
   createReport,
   getReportsForStaff,
   createStory,
@@ -1179,4 +1949,40 @@ module.exports = {
   markMessageRead,
   getMessageReadAt,
   updateMessageBody,
+  createSupportTicket,
+  getSupportTicketsByUser,
+  getSupportTicketById,
+  getAllSupportTickets,
+  getSupportTicketMessages,
+  addSupportTicketMessage,
+  updateSupportTicketStatus,
+  getSupportStats,
+  getPublicChatrooms,
+  getUserPrivateChatrooms,
+  getChatroomById,
+  createChatroom,
+  renameChatroom,
+  deleteChatroom,
+  clearChatroomMessages,
+  addChatroomMember,
+  removeChatroomMember,
+  getChatroomMembers,
+  isUserInChatroom,
+  getChatroomMessages,
+  hasOlderChatroomMessages,
+  sendChatroomMessage,
+  deleteChatroomMessage,
+  getChatroomMessageWithDetails,
+  staffUpdateUser,
+  updateUsername,
+  timeoutUser,
+  clearUserTimeout,
+  banUser,
+  unbanUser,
+  isUserTimedOut,
+  isUserBanned,
+  setUserAccentColor,
+  logModeratorAction,
+  getModeratorAuditLogs,
+  getModeratorAuditLogCount,
 };

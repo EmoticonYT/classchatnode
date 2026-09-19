@@ -1,0 +1,21 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+    </nav>
+    <div class="header-right">
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="join-screen" style="min-height:60vh;">
+  <div class="auth-card">
+    <h1>User not found</h1>
+    <p class="muted">@<%= username %> doesn't exist or has been removed.</p>
+    <a href="/feed" class="btn btn-primary">Back to Feed</a>
+  </div>
+</main>

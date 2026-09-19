@@ -1,0 +1,128 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support" class="active">Support</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="support-page" style="max-width: 760px; margin: 0 auto; padding: 24px;">
+  <div class="support-hero">
+    <div class="support-hero-text">
+      <h1>Help Center &amp; Support</h1>
+      <p>Need assistance with your account, classes, or have a question? Browse common answers below or open a ticket with staff.</p>
+    </div>
+    <div class="support-hero-actions">
+      <a href="/support/new" class="btn btn-primary" style="font-weight: 600;">+ Open Ticket</a>
+    </div>
+  </div>
+
+  <!-- Your Tickets -->
+  <section class="support-section">
+    <div class="support-section-header">
+      <div>
+        <h2>Your Tickets</h2>
+        <p class="section-subtitle">Track and reply to your open and past support inquiries</p>
+      </div>
+      <a href="/support/new" class="btn btn-primary btn-sm">+ New</a>
+    </div>
+
+    <% if (tickets && tickets.length) { %>
+    <div style="padding: 16px;">
+      <ul class="ticket-list">
+        <% tickets.forEach(function(t) { %>
+        <li>
+          <a href="/support/ticket/<%= t.id %>" class="ticket-card">
+            <div class="ticket-card-info">
+              <div class="ticket-card-header">
+                <span class="ticket-id-tag">#<%= t.id %></span>
+                <span class="badge-category"><%= t.category %></span>
+                <span class="badge-prio prio-<%= t.priority %>"><%= t.priority %></span>
+                <span class="badge-status badge-<%= t.status %>"><%= t.status.replace(/_/g, ' ') %></span>
+              </div>
+              <div class="ticket-card-title"><%= t.subject %></div>
+              <% if (t.last_message) { %>
+              <div class="ticket-last-msg"><%= t.last_message %></div>
+              <% } %>
+              <div class="ticket-card-meta">Updated <%= t.updated_at_fmt || t.created_at_fmt %></div>
+            </div>
+            <div>
+              <span class="btn btn-ghost btn-sm">View →</span>
+            </div>
+          </a>
+        </li>
+        <% }); %>
+      </ul>
+    </div>
+    <% } else { %>
+    <div style="padding: 40px 24px; text-align: center;">
+      <div style="font-size: 2.2rem; margin-bottom: 12px; opacity: 0.8;">🎫</div>
+      <h3 style="margin: 0 0 8px; color: var(--text);">No tickets opened yet</h3>
+      <p style="margin: 0 0 20px; color: var(--text-muted); font-size: 0.92rem;">Need help with anything? Submit a ticket and our staff will respond promptly.</p>
+      <a href="/support/new" class="btn btn-primary">Open Your First Ticket</a>
+    </div>
+    <% } %>
+  </section>
+
+  <!-- Knowledge Base & FAQs -->
+  <section class="support-section">
+    <div class="support-section-header">
+      <div>
+        <h2>Frequently Asked Questions</h2>
+        <p class="section-subtitle">Quick answers to common questions about ClassChat</p>
+      </div>
+    </div>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary class="faq-question">How do I change my password or profile info?</summary>
+        <div class="faq-answer">
+          You can update your profile photo, display name, and bio by navigating to your <strong>Profile</strong> page and clicking <strong>Edit Profile</strong>. For password changes or account recovery, open a support ticket under the <em>Account</em> category.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-question">How do class sections work?</summary>
+        <div class="faq-answer">
+          ClassChat is a student-led platform! You can view and filter topics by class subjects directly from your feed sidebar to study, collaborate, and share ideas with classmates.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-question">How do direct messaging and video calls work?</summary>
+        <div class="faq-answer">
+          You can message and start real-time video/audio calls with any confirmed friend. Navigate to <strong>Friends</strong> to connect with classmates, or visit <strong>Messages</strong> to start an encrypted discussion.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-question">How do I report inappropriate content or cyberbullying?</summary>
+        <div class="faq-answer">
+          ClassChat has a zero-tolerance policy for harassment. You can click the <strong>Report</strong> button on any post or message to alert the moderation team instantly, or open an <em>Urgent Report</em> ticket here in the support center.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-question">How long does it take for staff to respond to a ticket?</summary>
+        <div class="faq-answer">
+          Support tickets are monitored by school staff and moderators. Most tickets are addressed within a few hours during school days. Urgent tickets regarding safety or locked accounts are prioritized immediately.
+        </div>
+      </details>
+    </div>
+  </section>
+</main>

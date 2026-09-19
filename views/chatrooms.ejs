@@ -1,0 +1,133 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/chatrooms" class="active">Chatrooms</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/search">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="messages-page chatrooms-hub-page">
+  <div class="messages-header-row page-title-bubble">
+    <div class="messages-title-group">
+      <h1>Chatrooms</h1>
+      <span class="muted" style="font-size: 0.9rem;">School-wide open chatrooms for everyone</span>
+    </div>
+    <% if (is_staff) { %>
+    <button type="button" class="btn btn-primary btn-sm" id="btn-open-new-public-room">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      <span>+ New Public Room</span>
+    </button>
+    <% } %>
+  </div>
+
+  <section class="chatrooms-section" style="margin-top: 16px;">
+    <div class="section-title-wrap">
+      <h2>Public Chatrooms</h2>
+      <span class="muted" style="font-size: 0.85rem;"><%= publicChatrooms.length %> rooms available</span>
+    </div>
+
+    <ul class="chatrooms-list">
+      <% publicChatrooms.forEach(function(r) { %>
+      <li class="chatroom-card">
+        <a href="/chatrooms/<%= r.id %>" class="chatroom-card-link">
+          <div class="chatroom-card-icon public-icon">
+            <span>🌐</span>
+          </div>
+          <div class="chatroom-card-content">
+            <div class="chatroom-card-header">
+              <strong class="chatroom-card-name"><%= r.name %></strong>
+              <span class="room-pill room-pill-public">Public Chatroom</span>
+              <% if (r.last_at_fmt) { %>
+              <span class="chatroom-time muted"><%= r.last_at_fmt %></span>
+              <% } %>
+            </div>
+            <p class="chatroom-card-preview muted">
+              <%= r.last_body ? (r.last_body.length > 75 ? r.last_body.slice(0, 75) + '…' : r.last_body) : 'Active public chatroom — click to join the discussion!' %>
+            </p>
+          </div>
+          <div class="chatroom-card-arrow">
+            <span class="btn btn-primary btn-sm">Join →</span>
+          </div>
+        </a>
+
+        <% if (is_staff) { %>
+        <div class="chatroom-admin-bar">
+          <span class="muted" style="font-size: 0.75rem; font-weight: 600;">Staff Admin:</span>
+          <a href="/chatrooms/<%= r.id %>" class="btn btn-ghost btn-sm">Rename</a>
+          <form action="/staff/chatrooms/<%= r.id %>/clear" method="post" style="display:inline;" onsubmit="return confirm('Clear all messages from <%= r.name %>?');">
+            <button type="submit" class="btn btn-ghost btn-sm text-warning">Clear History</button>
+          </form>
+          <% if (!['Chatroom 1', 'Chatroom 2', 'Chatroom 3'].includes(r.name)) { %>
+          <form action="/staff/chatrooms/<%= r.id %>/delete" method="post" style="display:inline;" onsubmit="return confirm('Delete <%= r.name %>?');">
+            <button type="submit" class="btn btn-ghost btn-sm text-danger">Delete</button>
+          </form>
+          <% } %>
+        </div>
+        <% } %>
+      </li>
+      <% }); %>
+    </ul>
+  </section>
+</main>
+
+<% if (is_staff) { %>
+<!-- Create Public Chatroom Modal (Staff Only) -->
+<div id="new-public-room-modal" class="custom-modal-overlay" style="display:none;">
+  <div class="custom-modal-card">
+    <div class="custom-modal-header">
+      <h3>Create Public Chatroom</h3>
+      <button type="button" class="custom-modal-close" id="btn-close-public-modal">&times;</button>
+    </div>
+    <form action="/staff/chatrooms/new" method="post" class="create-room-form">
+      <div class="form-field">
+        <label for="public-room-name-input" class="form-label">Chatroom Name</label>
+        <input type="text" id="public-room-name-input" name="name" placeholder="e.g. Science Club, General Discussion" maxlength="80" required class="input-text">
+      </div>
+      <div class="custom-modal-actions">
+        <button type="button" class="btn btn-ghost" id="btn-cancel-public-modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Public Room</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  const modal = document.getElementById('new-public-room-modal');
+  const openBtn = document.getElementById('btn-open-new-public-room');
+  const closeBtn = document.getElementById('btn-close-public-modal');
+  const cancelBtn = document.getElementById('btn-cancel-public-modal');
+
+  if (openBtn && modal) {
+    openBtn.addEventListener('click', () => { modal.style.display = 'flex'; });
+  }
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+  }
+  if (cancelBtn && modal) {
+    cancelBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+  }
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.style.display = 'none';
+    });
+  }
+})();
+</script>
+<% } %>

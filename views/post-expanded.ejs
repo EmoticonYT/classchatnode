@@ -1,0 +1,144 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <% if (typeof userId !== 'undefined' && userId) { %>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/search">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+      <% } else { %>
+      <a href="/join">Log in</a>
+      <a href="/join">Sign up</a>
+      <% } %>
+    </nav>
+    <div class="header-right">
+      <% if (typeof userId !== 'undefined' && userId) { %>
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+      <% } else { %>
+      <span class="user-badge guest-badge">Viewing as guest</span>
+      <a href="/join" class="btn btn-ghost">Log in</a>
+      <% } %>
+    </div>
+  </div>
+</header>
+<main class="post-expanded-page">
+  <a href="/feed" class="back-link">← Back to Feed</a>
+  <article class="post-expanded">
+    <div class="post-expanded-top">
+      <div class="post-expanded-meta">
+        <% if (post.author_avatar) { %>
+        <img src="<%= post.author_avatar %>" alt="" class="post-expanded-avatar post-avatar-img">
+        <% } else { %>
+        <div class="post-expanded-avatar"><%= (post.display_name || post.username || '?').charAt(0).toUpperCase() %></div>
+        <% } %>
+        <div class="post-expanded-heading">
+          <span class="post-expanded-author">
+            <a href="/u/<%= post.username %>" class="post-author-link">
+              <strong class="post-display-name"><%= post.display_name || post.username %></strong>
+              <span class="post-handle muted">@<%= post.username %></span>
+            </a>
+            <% if (['emoticonyt', 'doriandelvalle'].includes((post.username || '').toLowerCase())) { %> <span class="owner-badge">Owner</span><% } %>
+          </span>
+          <% if (post.class_name) { %><span class="post-class-badge"><%= post.class_name %></span><% } %>
+          <span class="post-expanded-time"><%= post.created_at %></span>
+        </div>
+      </div>
+    </div>
+    <div class="post-expanded-body">
+      <p class="post-expanded-text"><%= post.body %></p>
+    </div>
+    <% if (post.image_path) { %>
+    <div class="post-expanded-image-wrap">
+      <img src="<%= post.image_path %>" alt="Post" class="post-expanded-image" loading="lazy">
+    </div>
+    <% } %>
+    <% if (post.file_path) { %><p class="post-attachment"><a href="<%= post.file_path %>" target="_blank" rel="noopener">📎 Attachment</a></p><% } %>
+    <% if (post.video_path) { %><p class="post-attachment"><a href="<%= post.video_path %>" target="_blank" rel="noopener">🎬 Video</a></p><% } %>
+    <div class="post-expanded-controls">
+      <% if (typeof userId !== 'undefined' && userId) { %>
+      <form action="/posts/<%= post.id %>/like" method="post" class="post-control-form">
+        <button type="submit" class="post-control-btn <%= userLiked ? 'active' : '' %>" title="Like">👍 <span><%= likeCount %></span></button>
+      </form>
+      <form action="/posts/<%= post.id %>/dislike" method="post" class="post-control-form">
+        <button type="submit" class="post-control-btn <%= userDisliked ? 'active' : '' %>" title="Dislike">👎 <span><%= dislikeCount %></span></button>
+      </form>
+      <a href="#reply-form" class="post-control-btn">💬 <span><%= replyCount %></span></a>
+      <form action="/posts/<%= post.id %>/save" method="post" class="post-control-form">
+        <button type="submit" class="post-control-btn <%= userSaved ? 'active' : '' %>" title="<%= userSaved ? 'Unsave' : 'Save' %>">🔖</button>
+      </form>
+      <% if (post.user_id === userId) { %>
+      <form action="/posts/<%= post.id %>/delete" method="post" class="post-control-form" onsubmit="return confirm('Delete this post?');">
+        <button type="submit" class="post-control-btn post-control-delete" title="Delete">🗑</button>
+      </form>
+      <% } %>
+      <% } else { %>
+      <span class="post-control-btn post-control-readonly">👍 <span><%= likeCount %></span></span>
+      <span class="post-control-btn post-control-readonly">👎 <span><%= dislikeCount %></span></span>
+      <span class="post-control-btn post-control-readonly">💬 <span><%= replyCount %></span></span>
+      <span class="post-control-btn post-control-readonly">🔖</span>
+      <% } %>
+    </div>
+  </article>
+  <section class="post-replies">
+    <h2>Replies (<%= replyCount %>)</h2>
+    <% if (typeof userId !== 'undefined' && userId) { %>
+    <form id="reply-form" action="/posts/<%= post.id %>/replies" method="post" enctype="multipart/form-data" class="reply-form">
+      <% if (typeof reply_error !== 'undefined' && reply_error === 'empty') { %><p class="form-error">Write something.</p><% } %>
+      <div class="reply-compose">
+        <% if (currentUser && currentUser.avatar_path) { %>
+        <img src="<%= currentUser.avatar_path %>" alt="" class="compose-avatar compose-avatar-img">
+        <% } else { %>
+        <div class="compose-avatar"><%= (username || '?').charAt(0).toUpperCase() %></div>
+        <% } %>
+        <div class="reply-fields">
+          <textarea name="body" placeholder="Write a reply..." rows="2" maxlength="2000" required></textarea>
+          <div class="reply-actions">
+            <label class="file-label"><input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp" class="file-input"><span class="btn btn-ghost btn-icon">📷</span></label>
+            <button type="submit" class="btn btn-primary">Reply</button>
+          </div>
+        </div>
+      </div>
+    </form>
+    <% } else { %>
+    <p class="guest-reply-hint muted">Log in to reply. <a href="/join">Log in</a> · <a href="/join">Sign up</a></p>
+    <% } %>
+    <ul class="replies-list">
+      <% replies.forEach(function(r) { %>
+      <li class="reply-item">
+        <% if (r.author_avatar) { %>
+        <img src="<%= r.author_avatar %>" alt="" class="post-avatar post-avatar-img">
+        <% } else { %>
+        <div class="post-avatar"><%= (r.display_name || r.username || '?').charAt(0).toUpperCase() %></div>
+        <% } %>
+        <div class="reply-body">
+          <div class="post-meta">
+            <span class="post-author">
+              <a href="/u/<%= r.username %>" class="post-author-link">
+                <strong class="post-display-name"><%= r.display_name || r.username %></strong>
+                <span class="post-handle muted">@<%= r.username %></span>
+              </a>
+            </span>
+            <span class="post-time"><%= r.created_at %></span>
+          </div>
+          <p class="post-text"><%= r.body %></p>
+          <% if (r.image_path) { %>
+          <div class="post-image-wrap"><img src="<%= r.image_path %>" alt="" class="post-image" loading="lazy"></div>
+          <% } %>
+        </div>
+      </li>
+      <% }); %>
+      <% if (replies.length === 0) { %>
+      <li class="reply-item empty muted">No replies yet.</li>
+      <% } %>
+    </ul>
+  </section>
+</main>

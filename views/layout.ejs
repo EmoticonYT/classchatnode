@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title : 'ClassChat' %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css?v=3.1.0">
+  <% if (typeof userSettings !== 'undefined' && userSettings && userSettings.accent_color) { %>
+  <style id="custom-accent-style">
+    :root, body, body.theme-light, body.theme-dark {
+      --accent: <%= userSettings.accent_color %>;
+      --accent-hover: <%= userSettings.accent_hover %>;
+      --accent-soft: <%= userSettings.accent_soft %>;
+    }
+  </style>
+  <% } %>
+</head>
+<body class="theme-<%= typeof userSettings !== 'undefined' && userSettings && userSettings.theme === 'light' ? 'light' : 'dark' %>">
+  <% const hasSidebar = ((typeof username !== 'undefined' && username) || (typeof isGuest !== 'undefined' && isGuest)) && (typeof hideSidebar === 'undefined' || !hideSidebar); %>
+
+  <% if (hasSidebar) { %>
+  <!-- Mobile Header Bar -->
+  <header class="mobile-top-bar">
+    <button type="button" class="mobile-menu-btn" id="mobile-sidebar-toggle" aria-label="Toggle navigation">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    </button>
+    <a href="/feed" class="mobile-brand">
+      <span class="logo-icon">💬</span>
+      <span class="brand-text">ClassChat</span>
+    </a>
+    <div class="mobile-right">
+      <% if (typeof username !== 'undefined' && username) { %>
+        <a href="/u/<%= username %>" class="mobile-avatar-link">
+          <% if (typeof currentUser !== 'undefined' && currentUser && currentUser.avatar_path) { %>
+            <img src="<%= currentUser.avatar_path %>" alt="" class="nav-user-avatar">
+          <% } else { %>
+            <div class="nav-user-avatar avatar-placeholder"><%= (typeof currentUser !== 'undefined' && currentUser && (currentUser.display_name || currentUser.username) ? (currentUser.display_name || currentUser.username) : (username || '?')).charAt(0).toUpperCase() %></div>
+          <% } %>
+        </a>
+      <% } else { %>
+        <a href="/join" class="btn btn-primary btn-sm">Log in</a>
+      <% } %>
+    </div>
+  </header>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <% } %>
+
+  <div class="<%= hasSidebar ? 'app-shell' : 'app-standalone-shell' %>">
+    <% if (hasSidebar) { %>
+    <!-- Floating Sidebar Navigation -->
+    <aside class="floating-sidebar" id="floating-sidebar">
+    <div class="sidebar-top">
+      <a href="/feed" class="sidebar-brand">
+        <span class="sidebar-logo-icon">💬</span>
+        <div class="sidebar-brand-text-wrap">
+          <span class="sidebar-brand-name">ClassChat</span>
+        </div>
+      </a>
+    </div>
+
+    <nav class="sidebar-nav-scroll">
+      <ul class="sidebar-nav-list">
+        <% const p = typeof currentPath !== 'undefined' ? currentPath : ''; %>
+        <li class="sidebar-item">
+          <a href="/feed" class="sidebar-link <%= p === '/feed' ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <span class="sidebar-label">Feed</span>
+          </a>
+        </li>
+
+        <% if (typeof username !== 'undefined' && username) { %>
+        <li class="sidebar-item">
+          <a href="/u/<%= username %>" class="sidebar-link <%= p.startsWith('/u/') && p.includes(username) ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span class="sidebar-label">Profile</span>
+          </a>
+        </li>
+
+        <li class="sidebar-item">
+          <a href="/messages" class="sidebar-link <%= p.startsWith('/messages') || p.startsWith('/conversations') ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span class="sidebar-label">Messages</span>
+          </a>
+        </li>
+
+        <% if (typeof featureFlags !== 'undefined' && featureFlags.chatroom_enabled) { %>
+        <li class="sidebar-item">
+          <a href="/chatrooms" class="sidebar-link <%= p.startsWith('/chatrooms') ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+            <span class="sidebar-label">Chatrooms</span>
+          </a>
+        </li>
+        <% } %>
+
+        <li class="sidebar-item">
+          <a href="/friends" class="sidebar-link <%= p === '/friends' ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span class="sidebar-label">Friends</span>
+            <% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount > 0) { %>
+              <span class="sidebar-badge"><%= pendingFriendRequestsCount %></span>
+            <% } %>
+          </a>
+        </li>
+
+        <li class="sidebar-item">
+          <a href="/activity" class="sidebar-link <%= p === '/activity' ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span class="sidebar-label">Activity</span>
+            <% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount > 0) { %>
+              <span class="sidebar-badge"><%= unreadActivityCount %></span>
+            <% } %>
+          </a>
+        </li>
+
+        <li class="sidebar-item">
+          <a href="/saved" class="sidebar-link <%= p === '/saved' ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            <span class="sidebar-label">Saved</span>
+          </a>
+        </li>
+
+        <li class="sidebar-item">
+          <a href="/call-history" class="sidebar-link <%= p === '/call-history' ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            <span class="sidebar-label">Calls</span>
+          </a>
+        </li>
+        <% } %>
+
+        <li class="sidebar-item">
+          <a href="/search" class="sidebar-link <%= p === '/search' ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span class="sidebar-label">Search</span>
+          </a>
+        </li>
+
+        <% if (typeof username !== 'undefined' && username) { %>
+        <li class="sidebar-item">
+          <a href="/settings" class="sidebar-link <%= p === '/settings' ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span class="sidebar-label">Settings</span>
+          </a>
+        </li>
+        <% } %>
+
+        <li class="sidebar-item">
+          <a href="/support" class="sidebar-link <%= p.startsWith('/support') ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <span class="sidebar-label">Support</span>
+          </a>
+        </li>
+
+        <% if (typeof is_staff !== 'undefined' && is_staff) { %>
+        <li class="sidebar-item">
+          <a href="/staff/dashboard" class="sidebar-link sidebar-staff-link <%= p.startsWith('/staff') ? 'active' : '' %>">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <span class="sidebar-label">Staff</span>
+          </a>
+        </li>
+        <% } %>
+      </ul>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <% if (typeof username !== 'undefined' && username) { %>
+        <div class="sidebar-user-card">
+          <a href="/u/<%= username %>" class="sidebar-user-link">
+            <% if (typeof currentUser !== 'undefined' && currentUser && currentUser.avatar_path) { %>
+              <img src="<%= currentUser.avatar_path %>" alt="" class="sidebar-user-avatar">
+            <% } else { %>
+              <div class="sidebar-user-avatar avatar-placeholder"><%= (typeof currentUser !== 'undefined' && currentUser && (currentUser.display_name || currentUser.username) ? (currentUser.display_name || currentUser.username) : username).charAt(0).toUpperCase() %></div>
+            <% } %>
+            <div class="sidebar-user-details">
+              <strong class="sidebar-user-name"><%= typeof currentUser !== 'undefined' && currentUser && currentUser.display_name ? currentUser.display_name : username %></strong>
+              <span class="sidebar-user-handle muted">@<%= username %></span>
+            </div>
+          </a>
+          <a href="/logout" class="sidebar-logout-btn" title="Log out">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </a>
+        </div>
+      <% } else { %>
+        <div class="sidebar-guest-card">
+          <p class="muted" style="font-size:0.82rem; margin:0 0 8px;">Viewing as Guest</p>
+          <a href="/join?login=1" class="btn btn-primary btn-block btn-sm">Log in</a>
+        </div>
+      <% } %>
+    </div>
+  </aside>
+  <% } %>
+
+  <div class="<%= hasSidebar ? 'app-main-canvas' : 'app-standalone-canvas' %>">
+    <div class="canvas-content-wrapper">
+      <%- body %>
+    </div>
+    <% if (!hasSidebar && typeof showSupportButton !== 'undefined' && showSupportButton) { %>
+    <footer class="app-footer">
+      <div class="app-footer-inner">
+        <p class="app-footer-fine">ClassChat 3.1 · Need help? <a href="/support">Help &amp; Support</a></p>
+      </div>
+    </footer>
+    <% } %>
+    </div>
+  </div>
+  <div id="incoming-call-modal" class="incoming-call-modal" style="display:none;">
+    <div class="incoming-call-box">
+      <p id="incoming-call-title" class="incoming-call-title">Incoming video call</p>
+      <p id="incoming-call-from" class="incoming-call-from"></p>
+      <div class="incoming-call-actions">
+        <button type="button" id="incoming-call-accept" class="btn btn-primary">Accept</button>
+        <button type="button" id="incoming-call-decline" class="btn btn-ghost">Decline</button>
+      </div>
+    </div>
+  </div>
+  <script src="/js/call-helper.js"></script>
+  <script src="/js/notifications.js"></script>
+  <script>
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { document.querySelectorAll('.incoming-call-modal').forEach(function(m) { m.style.display = 'none'; }); }
+    if (e.key === 'N' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') { var u = document.querySelector('a[href="/feed"]'); if (u) { e.preventDefault(); window.location.href = '/feed?new=1'; } }
+    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') { e.preventDefault(); var s = document.querySelector('a[href="/search"]'); if (s) s.click(); }
+  });
+
+  const sidebarToggle = document.getElementById('mobile-sidebar-toggle');
+    const floatingSidebar = document.getElementById('floating-sidebar');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+    if (sidebarToggle && floatingSidebar) {
+      sidebarToggle.addEventListener('click', function() {
+        floatingSidebar.classList.toggle('open');
+        if (sidebarBackdrop) sidebarBackdrop.classList.toggle('show');
+      });
+    }
+    if (sidebarBackdrop && floatingSidebar) {
+      sidebarBackdrop.addEventListener('click', function() {
+        floatingSidebar.classList.remove('open');
+        sidebarBackdrop.classList.remove('show');
+      });
+    }
+  </script>
+</body>
+</html>

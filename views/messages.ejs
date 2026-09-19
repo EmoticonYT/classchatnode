@@ -1,0 +1,235 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages" class="active">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/search">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="messages-page">
+  <div class="messages-header-row page-title-bubble">
+    <h1>Messages</h1>
+    <span class="muted" style="font-size: 0.9rem;">Real-time direct messages</span>
+  </div>
+
+  <% if (typeof error !== 'undefined' && error === 'not_friends') { %>
+  <p class="message-error">You can only message friends. Add them as a friend from their profile first.</p>
+  <% } else if (typeof error !== 'undefined' && error === 'user') { %>
+  <p class="message-error">That user wasn't found.</p>
+  <% } %>
+
+  <% if (typeof pendingRequestsToMe !== 'undefined' && pendingRequestsToMe.length > 0) { %>
+  <section class="friend-requests-section">
+    <h2>Friend requests</h2>
+    <p class="muted">Accept or decline requests. You can also visit their profile and use Accept there.</p>
+    <ul class="friend-requests-list">
+      <% pendingRequestsToMe.forEach(function(r) { %>
+      <li class="friend-request-item">
+        <a href="/u/<%= r.username %>" class="friend-request-user">
+          <% if (r.avatar_path) { %>
+          <img src="<%= r.avatar_path %>" alt="" class="conversation-avatar">
+          <% } else { %>
+          <div class="conversation-avatar conversation-avatar-initial"><%= (r.display_name || r.username || '?').charAt(0).toUpperCase() %></div>
+          <% } %>
+          <span class="conversation-name"><%= r.display_name || r.username %> @<%= r.username %></span>
+        </a>
+        <div class="friend-request-actions">
+          <form action="/friends/accept" method="post" style="display:inline;">
+            <input type="hidden" name="username" value="<%= r.username %>">
+            <button type="submit" class="btn btn-primary btn-sm">Accept</button>
+          </form>
+          <form action="/friends/decline" method="post" style="display:inline;">
+            <input type="hidden" name="username" value="<%= r.username %>">
+            <button type="submit" class="btn btn-ghost btn-sm">Decline</button>
+          </form>
+        </div>
+      </li>
+      <% }); %>
+    </ul>
+  </section>
+  <% } %>
+
+  <div id="no-conversations-empty" class="muted conversation-empty-state" style="<%= conversations.length === 0 && (!pendingRequestsToMe || pendingRequestsToMe.length === 0) ? '' : 'display:none;' %>">
+    <p>No conversations yet. Start one by visiting a friend's profile and clicking "Message".</p>
+  </div>
+
+  <ul class="conversations-list" id="conversations-list" style="<%= conversations.length > 0 ? '' : 'display:none;' %>">
+    <% conversations.forEach(function(c) { %>
+    <li class="conversation-item" data-username="<%= c.username %>">
+      <a href="/messages/<%= c.username %>" class="conversation-link">
+        <div class="conversation-avatar-wrap">
+          <% if (c.avatar_path) { %>
+          <img src="<%= c.avatar_path %>" alt="" class="conversation-avatar">
+          <% } else { %>
+          <div class="conversation-avatar conversation-avatar-initial"><%= (c.display_name || c.username || '?').charAt(0).toUpperCase() %></div>
+          <% } %>
+          <span class="status-dot <%= c.isOnline ? 'online' : 'offline' %>" data-status-user="<%= c.username %>" title="<%= c.isOnline ? 'Online now' : 'Offline' %>"></span>
+        </div>
+        <div class="conversation-info">
+          <div class="conversation-name-row">
+            <span class="conversation-name"><%= c.display_name || c.username %></span>
+            <span class="conversation-time muted" data-time-user="<%= c.username %>"><%= c.last_at %></span>
+          </div>
+          <span class="conversation-preview muted" data-preview-user="<%= c.username %>">
+            <%= c.last_body ? (c.last_body.length > 60 ? c.last_body.slice(0, 60) + '…' : c.last_body) : 'No messages yet' %>
+          </span>
+        </div>
+      </a>
+    </li>
+    <% }); %>
+  </ul>
+
+  <div class="messages-new">
+    <h2>Start a new chat</h2>
+    <p class="muted">Go to any friend's profile and click "Message" to begin chatting in real time.</p>
+  </div>
+</main>
+
+<script>
+(function() {
+  const currentUsername = <%- JSON.stringify(username) %>;
+  const list = document.getElementById('conversations-list');
+  const emptyState = document.getElementById('no-conversations-empty');
+  let ws = null;
+  let wsTimer = null;
+
+  function playChime() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(698.46, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    } catch (_) {}
+  }
+
+  function connect() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    fetch('/api/call/token', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(data => {
+        if (!data || !data.token) return;
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${location.host}/ws?token=${encodeURIComponent(data.token)}`);
+
+        ws.onopen = function() {
+          if (wsTimer) { clearTimeout(wsTimer); wsTimer = null; }
+          // Check online presence for all users currently in the list
+          document.querySelectorAll('[data-status-user]').forEach(el => {
+            const u = el.dataset.statusUser;
+            if (u) ws.send(JSON.stringify({ type: 'check_online', username: u }));
+          });
+        };
+
+        ws.onmessage = function(ev) {
+          let msg;
+          try { msg = JSON.parse(ev.data); } catch (_) { return; }
+
+          if (msg.type === 'online_status' && msg.username) {
+            const dot = document.querySelector(`[data-status-user="${msg.username}"]`);
+            if (dot) {
+              dot.className = `status-dot ${msg.isOnline ? 'online' : 'offline'}`;
+              dot.title = msg.isOnline ? 'Online now' : 'Offline';
+            }
+          }
+
+          if (msg.type === 'new_message') {
+            const m = msg.message;
+            if (!m) return;
+            const otherUser = m.sender_username === currentUsername ? msg.conversationWith : m.sender_username;
+            if (!otherUser) return;
+
+            let row = document.querySelector(`li.conversation-item[data-username="${otherUser}"]`);
+            if (!row) {
+              // Dynamically create conversation row if friend messaged
+              row = document.createElement('li');
+              row.className = 'conversation-item';
+              row.dataset.username = otherUser;
+              const initial = otherUser.charAt(0).toUpperCase();
+              const avatarHtml = m.sender_avatar && m.sender_username === otherUser
+                ? `<img src="${m.sender_avatar}" alt="" class="conversation-avatar">`
+                : `<div class="conversation-avatar conversation-avatar-initial">${initial}</div>`;
+
+              row.innerHTML = `
+                <a href="/messages/${encodeURIComponent(otherUser)}" class="conversation-link">
+                  <div class="conversation-avatar-wrap">
+                    ${avatarHtml}
+                    <span class="status-dot online" data-status-user="${otherUser}" title="Online now"></span>
+                  </div>
+                  <div class="conversation-info">
+                    <div class="conversation-name-row">
+                      <span class="conversation-name">@${otherUser}</span>
+                      <span class="conversation-time muted" data-time-user="${otherUser}">Just now</span>
+                    </div>
+                    <span class="conversation-preview muted" data-preview-user="${otherUser}"></span>
+                  </div>
+                </a>
+              `;
+              if (emptyState) emptyState.style.display = 'none';
+              if (list) {
+                list.style.display = 'flex';
+                list.prepend(row);
+              }
+            } else {
+              // Bump existing row to top
+              if (list && list.firstChild !== row) {
+                list.prepend(row);
+              }
+            }
+
+            // Update preview and time
+            const previewEl = row.querySelector(`[data-preview-user="${otherUser}"]`);
+            const timeEl = row.querySelector(`[data-time-user="${otherUser}"]`);
+            const snippet = m.body ? (m.body.length > 60 ? m.body.slice(0, 60) + '…' : m.body) : 'Sent an attachment';
+            if (previewEl) previewEl.textContent = snippet;
+            if (timeEl) timeEl.textContent = 'Just now';
+
+            // Flash row subtly
+            row.classList.add('conversation-item-flash');
+            setTimeout(() => row.classList.remove('conversation-item-flash'), 1200);
+
+            // Play incoming chime if message received from other person
+            if (m.sender_username !== currentUsername) {
+              playChime();
+            }
+          }
+        };
+
+        ws.onclose = function() {
+          ws = null;
+          if (!wsTimer) wsTimer = setTimeout(connect, 3000);
+        };
+      })
+      .catch(() => {
+        if (!wsTimer) wsTimer = setTimeout(connect, 3000);
+      });
+  }
+
+  connect();
+})();
+</script>

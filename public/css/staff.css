@@ -1,0 +1,613 @@
+/* ==========================================================================
+   ClassChat Staff Portal - Ultra Modern Dark Design System
+   ========================================================================== */
+
+:root {
+  --staff-max-width: 1240px;
+}
+
+.staff-body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.staff-body a {
+  color: var(--accent);
+  transition: color 0.15s ease;
+  text-decoration: none;
+}
+.staff-body a:hover {
+  color: var(--accent-hover);
+}
+
+/* --------------------------------------------------------------------------
+   Staff Header - Centered & Glassmorphic
+   -------------------------------------------------------------------------- */
+.staff-header {
+  background: rgba(18, 18, 24, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 0;
+  width: 100%;
+}
+
+.staff-header-inner {
+  max-width: var(--staff-max-width);
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.staff-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.staff-header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.staff-header .brand .logo-icon {
+  font-size: 1.35rem;
+  filter: drop-shadow(0 2px 8px rgba(99, 102, 241, 0.4));
+}
+
+.staff-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(139, 92, 246, 0.25));
+  color: #a5b4fc;
+  border: 1px solid rgba(165, 180, 252, 0.35);
+  border-radius: 999px;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+}
+
+.staff-district-tag {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-family: "JetBrains Mono", monospace;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.staff-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.staff-nav a {
+  padding: 8px 15px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: 10px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.staff-nav a:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+.staff-nav a.active {
+  color: #fff;
+  background: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   Staff Main Container
+   -------------------------------------------------------------------------- */
+.staff-main {
+  max-width: var(--staff-max-width);
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Page Header & Subtitle */
+.staff-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.staff-page-header h1 {
+  margin: 0 0 6px;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.staff-page-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   KPI Stat Cards
+   -------------------------------------------------------------------------- */
+.staff-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.staff-stat {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.01) 100%), var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-decoration: none !important;
+}
+
+.staff-stat:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.5), 0 0 20px rgba(99, 102, 241, 0.15);
+}
+
+.staff-stat .value {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.staff-stat .label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.staff-stat-pill {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   Staff Sections (Cards)
+   -------------------------------------------------------------------------- */
+.staff-section {
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.4);
+}
+
+.staff-section-header {
+  padding: 18px 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%), var(--bg-elevated);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.staff-section-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.staff-section-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.staff-section > h2:not(.staff-section-header h2) {
+  margin: 0;
+  padding: 18px 24px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%), var(--bg-elevated);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.staff-section-desc {
+  margin: 0;
+  padding: 12px 24px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+/* Mini stat filters inside dashboard section */
+.staff-section-stats {
+  display: flex;
+  gap: 10px;
+  padding: 14px 24px;
+  background: rgba(255, 255, 255, 0.015);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-x: auto;
+  flex-wrap: wrap;
+}
+
+.staff-stat-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+.staff-stat-mini:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.staff-stat-mini .stat-mini-val {
+  font-weight: 700;
+  color: var(--text);
+}
+.staff-stat-mini.stat-open .stat-mini-val { color: #fbbf24; }
+.staff-stat-mini.stat-in-progress .stat-mini-val { color: #60a5fa; }
+.staff-stat-mini.stat-waiting .stat-mini-val { color: #c084fc; }
+.staff-stat-mini.stat-resolved .stat-mini-val { color: #34d399; }
+
+/* --------------------------------------------------------------------------
+   Tables - Clean, Responsive, and No Sticky Edge-Clipping
+   -------------------------------------------------------------------------- */
+.staff-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.staff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.staff-table th,
+.staff-table td {
+  padding: 14px 20px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.staff-table th {
+  font-weight: 600;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.staff-table tbody tr {
+  transition: background 0.15s ease;
+}
+.staff-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.staff-table tr:last-child td {
+  border-bottom: none;
+}
+
+.staff-table .mono {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.staff-table .cell-body {
+  max-width: 340px;
+}
+
+.staff-table .cell-actions {
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 20px;
+  position: static !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* Action buttons */
+.staff-table .btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+  margin-left: 6px;
+  transition: all 0.15s ease;
+}
+.staff-table .btn-sm:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+.staff-table .btn-sm.danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+}
+.staff-table .btn-sm.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #fff;
+}
+
+/* --------------------------------------------------------------------------
+   Filter Tabs / Segmented Control
+   -------------------------------------------------------------------------- */
+.staff-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  padding: 6px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.staff-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: 10px;
+  transition: all 0.15s ease;
+}
+.staff-filter-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+.staff-filter-tab.active {
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+}
+
+.staff-filter-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+}
+.staff-filter-tab.active .staff-filter-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* --------------------------------------------------------------------------
+   Ticket Detail Layout (2-Column)
+   -------------------------------------------------------------------------- */
+.staff-ticket-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .staff-ticket-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.staff-sidebar-box {
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+}
+
+.staff-sidebar-box h3 {
+  margin: 0 0 16px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 12px;
+}
+
+.staff-meta-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 0.9rem;
+}
+
+.staff-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.staff-meta-label {
+  color: var(--text-muted);
+}
+
+.staff-meta-val {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* --------------------------------------------------------------------------
+   Maintenance Box
+   -------------------------------------------------------------------------- */
+.maintenance-card-content {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.maintenance-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.maintenance-status-badge.status-live {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.maintenance-status-badge.status-active {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.status-dot-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-live .status-dot-pulse {
+  background: #22c55e;
+  box-shadow: 0 0 10px #22c55e;
+}
+.status-active .status-dot-pulse {
+  background: #f59e0b;
+  box-shadow: 0 0 10px #f59e0b;
+}
+
+/* --------------------------------------------------------------------------
+   Avatars, Badges & Owners
+   -------------------------------------------------------------------------- */
+.staff-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.staff-avatar-initial {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1;
+}
+
+.staff-body .owner-badge {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.25));
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 999px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-left: 6px;
+  vertical-align: middle;
+}

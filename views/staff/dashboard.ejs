@@ -1,0 +1,510 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support">Support</a>
+      <a href="/staff/dashboard" class="active">Staff</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %><% if (typeof district !== 'undefined' && district) { %> · <%= district %><% } %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="staff-page" style="max-width: 760px; margin: 0 auto; padding: 24px;">
+  <div class="staff-page-header">
+    <h1>Staff Dashboard</h1>
+    <p class="staff-page-subtitle">School administration, content moderation, and student support inquiries.</p>
+  </div>
+
+  <div class="staff-subnav">
+    <a href="/staff/dashboard" class="btn btn-primary btn-sm">Dashboard</a>
+    <a href="/staff/support" class="btn btn-ghost btn-sm">Support Queue (<%= typeof supportStats !== 'undefined' ? supportStats.open : 0 %> open)</a>
+    <a href="/staff/audit-log" class="btn btn-ghost btn-sm">Audit Log</a>
+    <a href="/staff/profile" class="btn btn-ghost btn-sm">Staff Profile</a>
+  </div>
+
+  <!-- KPI Stats -->
+  <div class="staff-stats">
+    <a href="#users" class="staff-stat">
+      <div class="value"><%= stats.users %></div>
+      <div class="label">Total Users</div>
+    </a>
+    <a href="#posts" class="staff-stat">
+      <div class="value"><%= stats.posts %></div>
+      <div class="label">Total Posts</div>
+    </a>
+    <a href="/staff/support" class="staff-stat">
+      <div class="value"><%= typeof supportStats !== 'undefined' ? supportStats.total : 0 %></div>
+      <div class="label">Support Tickets</div>
+    </a>
+    <a href="#classes" class="staff-stat">
+      <div class="value"><%= typeof classes !== 'undefined' ? classes.length : 0 %></div>
+      <div class="label">Active Classes</div>
+    </a>
+  </div>
+
+  <!-- System Maintenance Control -->
+  <div class="staff-section" style="padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <div>
+      <h3 style="margin: 0 0 4px; font-size: 1.05rem;">System Maintenance</h3>
+      <p class="muted" style="margin: 0; font-size: 0.85rem;">
+        Status:
+        <% if (typeof maintenanceMode !== 'undefined' && maintenanceMode) { %>
+        <strong style="color: #ef4444;">ACTIVE (students see maintenance page)</strong>
+        <% } else { %>
+        <strong style="color: var(--success);">Operational (site is live)</strong>
+        <% } %>
+      </p>
+    </div>
+    <form action="/staff/maintenance/toggle" method="post" style="margin: 0;" onsubmit="return confirm('Toggle maintenance mode?');">
+      <% if (typeof maintenanceMode !== 'undefined' && maintenanceMode) { %>
+      <button type="submit" class="btn btn-primary btn-sm" style="background: var(--success); border-color: var(--success);">Turn Maintenance Off</button>
+      <% } else { %>
+      <button type="submit" class="btn btn-sm btn-ghost" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">Turn Maintenance On</button>
+      <% } %>
+    </form>
+  </div>
+
+  <!-- Support Tickets Section -->
+  <div class="staff-section" id="support-tickets">
+    <div class="support-section-header">
+      <div>
+        <h2>Support Tickets</h2>
+        <p class="section-subtitle">Student inquiries, account issues, and bug reports</p>
+      </div>
+      <a href="/staff/support" class="btn btn-primary btn-sm">Full Queue (<%= typeof supportStats !== 'undefined' ? supportStats.open : 0 %> open) →</a>
+    </div>
+
+    <% if (typeof recentTickets !== 'undefined' && recentTickets.length) { %>
+    <div style="padding: 16px;">
+      <ul class="ticket-list">
+        <% recentTickets.forEach(function(t) { %>
+        <li>
+          <a href="/staff/support/ticket/<%= t.id %>" class="ticket-card">
+            <div class="ticket-card-info">
+              <div class="ticket-card-header">
+                <span class="ticket-id-tag">#<%= t.id %></span>
+                <span class="badge-category"><%= t.category %></span>
+                <span class="badge-prio prio-<%= t.priority %>"><%= t.priority %></span>
+                <span class="badge-status badge-<%= t.status %>"><%= t.status.replace(/_/g, ' ') %></span>
+                <span class="muted" style="font-size: 0.8rem;">by <%= t.display_name ? t.display_name + ' (@' + t.username + ')' : '@' + t.username %></span>
+              </div>
+              <div class="ticket-card-title"><%= t.subject %></div>
+              <div class="ticket-card-meta">Updated <%= t.updated_at_fmt || t.created_at_fmt %></div>
+            </div>
+            <div>
+              <span class="btn btn-ghost btn-sm">Reply →</span>
+            </div>
+          </a>
+        </li>
+        <% }); %>
+      </ul>
+    </div>
+    <% } else { %>
+    <div style="padding: 32px 20px; text-align: center;" class="muted">
+      No open support tickets. Students can submit tickets from the Help &amp; Support page.
+    </div>
+    <% } %>
+  </div>
+
+  <!-- Posts Moderation -->
+  <div class="staff-section" id="posts">
+    <div class="support-section-header">
+      <div>
+        <h2>Feed Posts Moderation</h2>
+        <p class="section-subtitle">Review, edit, or delete recent posts</p>
+      </div>
+      <span class="muted" style="font-size: 0.85rem;"><%= posts.length %> posts</span>
+    </div>
+    <div class="staff-table-wrap" style="margin-bottom: 0; border: none; border-radius: 0;">
+      <table class="staff-table">
+        <thead>
+          <tr>
+            <th style="width: 60px;">ID</th>
+            <th>Author</th>
+            <th>Content</th>
+            <th>Date</th>
+            <th class="cell-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% posts.forEach(function(p) { %>
+          <tr>
+            <td class="muted">#<%= p.id %></td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <% if (p.author_avatar) { %>
+                <img src="<%= p.author_avatar %>" alt="" class="staff-avatar">
+                <% } else { %>
+                <span class="staff-avatar staff-avatar-initial"><%= (p.display_name || p.username || '?').charAt(0).toUpperCase() %></span>
+                <% } %>
+                <span>
+                  <strong><%= p.display_name || p.username %></strong>
+                  <% if (p.display_name) { %> <span class="muted" style="font-size: 0.85em; font-weight: normal;">@<%= p.username %></span><% } %>
+                </span>
+              </div>
+            </td>
+            <td style="max-width: 260px;"><%= p.body.length > 60 ? p.body.slice(0, 60) + '…' : p.body %></td>
+            <td class="muted" style="font-size: 0.8rem;"><%= p.created_at %></td>
+            <td class="cell-actions">
+              <a href="/staff/posts/<%= p.id %>/edit" class="btn btn-ghost btn-sm">Edit</a>
+              <form action="/staff/posts/<%= p.id %>/delete" method="post" style="display:inline;" onsubmit="return confirm('Delete post #<%= p.id %>?');">
+                <button type="submit" class="btn btn-ghost btn-sm" style="color: #ef4444;">Delete</button>
+              </form>
+            </td>
+          </tr>
+          <% }); %>
+          <% if (posts.length === 0) { %>
+          <tr><td colspan="5" class="muted" style="text-align: center; padding: 24px;">No posts found.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Classes Management -->
+  <div class="staff-section" id="classes">
+    <div class="support-section-header">
+      <div>
+        <h2>Class Sections</h2>
+        <p class="section-subtitle">Manage class subjects students can filter feed posts by</p>
+      </div>
+    </div>
+    <div style="padding: 16px 20px; border-bottom: 1px solid var(--border);">
+      <form action="/staff/classes" method="post" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <input type="text" name="name" placeholder="New class name (e.g. AP Chemistry)..." maxlength="80" required style="flex: 1; min-width: 200px;">
+        <button type="submit" class="btn btn-primary btn-sm">+ Add Class</button>
+      </form>
+    </div>
+    <div class="staff-table-wrap" style="margin-bottom: 0; border: none; border-radius: 0;">
+      <table class="staff-table">
+        <thead>
+          <tr>
+            <th style="width: 60px;">ID</th>
+            <th>Class Name</th>
+            <th class="cell-actions">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (typeof classes !== 'undefined' && classes.length) { %>
+          <% classes.forEach(function(c) { %>
+          <tr>
+            <td class="muted">#<%= c.id %></td>
+            <td style="font-weight: 600;"><%= c.name %></td>
+            <td class="cell-actions">
+              <form action="/staff/classes/<%= c.id %>/delete" method="post" style="display:inline;" onsubmit="return confirm('Remove class <%= c.name %>?');">
+                <button type="submit" class="btn btn-ghost btn-sm" style="color: #ef4444;">Delete</button>
+              </form>
+            </td>
+          </tr>
+          <% }); %>
+          <% } else { %>
+          <tr><td colspan="3" class="muted" style="text-align: center; padding: 20px;">No classes created yet.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <% if (typeof featureFlags !== 'undefined' && featureFlags.chatroom_enabled) { %>
+  <!-- Chatroom Management -->
+  <div class="staff-section" id="chatrooms">
+    <div class="support-section-header">
+      <div>
+        <h2>Chatroom Management</h2>
+        <p class="section-subtitle">Manage school-wide public chatrooms</p>
+      </div>
+      <form action="/staff/chatrooms/new" method="post" style="display: flex; gap: 8px; margin: 0;">
+        <input type="text" name="name" placeholder="New public room name..." required style="padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text); font-size: 0.85rem;">
+        <button type="submit" class="btn btn-primary btn-sm">+ Create Room</button>
+      </form>
+    </div>
+    <div class="staff-table-wrap" style="margin-bottom: 0; border: none; border-radius: 0;">
+      <table class="staff-table">
+        <thead>
+          <tr>
+            <th style="width: 60px;">ID</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Last Active</th>
+            <th class="cell-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (typeof publicChatrooms !== 'undefined' && publicChatrooms.length) { %>
+          <% publicChatrooms.forEach(function(r) { %>
+          <tr>
+            <td class="muted">#<%= r.id %></td>
+            <td style="font-weight: 600;"><a href="/chatrooms/<%= r.id %>" style="color: var(--accent); text-decoration: none;"><%= r.name %></a></td>
+            <td><span class="room-pill room-pill-public">Public</span></td>
+            <td class="muted" style="font-size: 0.8rem;"><%= r.last_at || 'Never' %></td>
+            <td class="cell-actions">
+              <a href="/chatrooms/<%= r.id %>" class="btn btn-ghost btn-sm">Open</a>
+              <form action="/staff/chatrooms/<%= r.id %>/clear" method="post" style="display:inline;" onsubmit="return confirm('Clear all messages from <%= r.name %>?');">
+                <button type="submit" class="btn btn-ghost btn-sm text-warning">Clear</button>
+              </form>
+              <% if (!['Chatroom 1', 'Chatroom 2', 'Chatroom 3'].includes(r.name)) { %>
+              <form action="/staff/chatrooms/<%= r.id %>/delete" method="post" style="display:inline;" onsubmit="return confirm('Delete <%= r.name %> completely?');">
+                <button type="submit" class="btn btn-ghost btn-sm" style="color: #ef4444;">Delete</button>
+              </form>
+              <% } %>
+            </td>
+          </tr>
+          <% }); %>
+          <% } else { %>
+          <tr><td colspan="5" class="muted" style="text-align: center; padding: 20px;">No public chatrooms available.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- User Accounts Management -->
+  <div class="staff-section" id="users">
+    <div class="support-section-header">
+      <div>
+        <h2>Registered Users</h2>
+        <p class="section-subtitle">Manage student and staff roles</p>
+      </div>
+      <span class="muted" style="font-size: 0.85rem;"><%= users.length %> users</span>
+    </div>
+    <div class="staff-table-wrap" style="margin-bottom: 0; border: none; border-radius: 0;">
+      <table class="staff-table">
+        <thead>
+          <tr>
+            <th style="width: 60px;">ID</th>
+            <th>User</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Joined</th>
+            <th class="cell-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach(function(u) { %>
+          <% 
+             const uIsOwner = ['emoticonyt', 'doriandelvalle'].includes((u.username || '').toLowerCase());
+             const viewerIsOwner = ['emoticonyt', 'doriandelvalle'].includes((user.username || '').toLowerCase());
+             const isTimedOut = u.timeout_until && new Date(u.timeout_until).getTime() > Date.now();
+          %>
+          <tr>
+            <td class="muted">#<%= u.id %></td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <% if (u.avatar_path) { %>
+                <img src="<%= u.avatar_path %>" alt="" class="staff-avatar">
+                <% } else { %>
+                <span class="staff-avatar staff-avatar-initial"><%= (u.display_name || u.username || '?').charAt(0).toUpperCase() %></span>
+                <% } %>
+                <span>
+                  <strong><%= u.display_name || u.username %></strong>
+                  <span class="muted" style="font-size: 0.85em; font-weight: normal;">@<%= u.username %></span>
+                  <% if (uIsOwner) { %> <span class="owner-badge">Owner</span><% } %>
+                </span>
+              </div>
+            </td>
+            <td>
+              <% if (u.is_staff) { %>
+              <span class="staff-badge">Staff</span>
+              <% } else { %>
+              <span class="muted">Student</span>
+              <% } %>
+            </td>
+            <td>
+              <% if (u.is_banned) { %>
+              <span class="status-badge-banned" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;" title="<%= u.ban_reason || 'Banned' %>">Banned</span>
+              <% } else if (isTimedOut) { %>
+              <span class="status-badge-timeout" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;" title="Until <%= new Date(u.timeout_until).toLocaleString() %>: <%= u.timeout_reason || 'No reason' %>">Timed Out</span>
+              <% } else { %>
+              <span class="status-badge-active" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">Active</span>
+              <% } %>
+            </td>
+            <td class="muted" style="font-size: 0.8rem;"><%= u.created_at %></td>
+            <td class="cell-actions">
+              <a href="/staff/users/<%= u.id %>/edit" class="btn btn-ghost btn-sm">Edit</a>
+
+              <% if (u.id !== user.id && !uIsOwner) { %>
+                <!-- Timeout / Untimeout Action -->
+                <% if (isTimedOut) { %>
+                  <% if (!u.is_staff || viewerIsOwner) { %>
+                  <form action="/staff/users/<%= u.id %>/untimeout" method="post" style="display:inline;">
+                    <button type="submit" class="btn btn-ghost btn-sm text-warning" title="Clear timeout early">Untimeout</button>
+                  </form>
+                  <% } %>
+                <% } else { %>
+                  <% if (!u.is_staff || viewerIsOwner) { %>
+                  <button type="button" class="btn btn-ghost btn-sm text-warning" onclick="openTimeoutModal('<%= u.id %>', '<%= u.username %>', <%= u.is_staff ? 'true' : 'false' %>)">Timeout</button>
+                  <% } %>
+                <% } %>
+
+                <!-- Ban / Unban Action (Only doable through @emoticonyt) -->
+                <% if (viewerIsOwner) { %>
+                  <% if (u.is_banned) { %>
+                  <form action="/staff/users/<%= u.id %>/unban" method="post" style="display:inline;">
+                    <button type="submit" class="btn btn-ghost btn-sm" style="color: #10b981;" onclick="return confirm('Unban @<%= u.username %>?');">Unban</button>
+                  </form>
+                  <% } else { %>
+                  <button type="button" class="btn btn-ghost btn-sm" style="color: #ef4444;" onclick="openBanModal('<%= u.id %>', '<%= u.username %>')">Ban</button>
+                  <% } %>
+                <% } %>
+
+                <form action="/staff/users/<%= u.id %>/delete" method="post" style="display:inline;" onsubmit="return confirm('Permanently delete user @<%= u.username %>?');">
+                  <button type="submit" class="btn btn-ghost btn-sm" style="color: #94a3b8;">Delete</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<style>
+  .modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+  .modal-dialog {
+    background: #181920;
+    border: 1px solid #2e3240;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 440px;
+    padding: 24px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+  .btn-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .btn-close:hover {
+    color: #fff;
+  }
+</style>
+
+<!-- Moderation Modals -->
+<div id="timeout-modal" class="modal-backdrop" style="display: none;">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 id="timeout-modal-title">Timeout User</h3>
+      <button type="button" class="btn-close" onclick="closeTimeoutModal()">&times;</button>
+    </div>
+    <form id="timeout-form" method="post">
+      <div class="modal-body">
+        <p id="timeout-modal-desc" class="muted" style="margin-top: 0; font-size: 0.88rem;"></p>
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="timeout-duration" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Duration</label>
+          <select id="timeout-duration" name="duration" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text);">
+            <option value="5">5 Minutes</option>
+            <option value="15" selected>15 Minutes</option>
+            <option value="60">1 Hour</option>
+            <option value="1440">24 Hours (1 Day)</option>
+            <option value="10080">7 Days</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="timeout-reason" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Reason for Timeout</label>
+          <input type="text" id="timeout-reason" name="reason" placeholder="e.g. Inappropriate behavior, spamming..." required style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text);">
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeTimeoutModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm" style="background: #f59e0b; border-color: #f59e0b; color: #000; font-weight: 600;">Apply Timeout</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="ban-modal" class="modal-backdrop" style="display: none;">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 id="ban-modal-title" style="color: #ef4444;">Permanently Ban Account</h3>
+      <button type="button" class="btn-close" onclick="closeBanModal()">&times;</button>
+    </div>
+    <form id="ban-form" method="post">
+      <div class="modal-body">
+        <p id="ban-modal-desc" class="muted" style="margin-top: 0; font-size: 0.88rem;"></p>
+        <div class="form-group">
+          <label for="ban-reason" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Reason for Ban</label>
+          <input type="text" id="ban-reason" name="reason" placeholder="e.g. Severe violation of terms, harassment..." required style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text);">
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeBanModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm" style="background: #ef4444; border-color: #ef4444; color: #fff; font-weight: 600;">Confirm Ban</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openTimeoutModal(id, username, isStaff) {
+  const modal = document.getElementById('timeout-modal');
+  const title = document.getElementById('timeout-modal-title');
+  const desc = document.getElementById('timeout-modal-desc');
+  const form = document.getElementById('timeout-form');
+  form.action = '/staff/users/' + id + '/timeout';
+  title.textContent = (isStaff ? 'Moderator Timeout' : 'Timeout User') + ': @' + username;
+  desc.textContent = isStaff 
+    ? 'Issuing a moderator timeout to @' + username + '. They will be temporarily locked out of the platform.'
+    : 'Apply a temporary timeout to @' + username + '. They will see an expiration countdown screen.';
+  modal.style.display = 'flex';
+}
+function closeTimeoutModal() {
+  document.getElementById('timeout-modal').style.display = 'none';
+}
+function openBanModal(id, username) {
+  const modal = document.getElementById('ban-modal');
+  const title = document.getElementById('ban-modal-title');
+  const desc = document.getElementById('ban-modal-desc');
+  const form = document.getElementById('ban-form');
+  form.action = '/staff/users/' + id + '/ban';
+  title.textContent = 'Permanently Ban @' + username;
+  desc.textContent = 'Are you sure you want to permanently suspend @' + username + '? They will be locked out and active sessions terminated.';
+  modal.style.display = 'flex';
+}
+function closeBanModal() {
+  document.getElementById('ban-modal').style.display = 'none';
+}
+window.addEventListener('click', function(e) {
+  const tModal = document.getElementById('timeout-modal');
+  const bModal = document.getElementById('ban-modal');
+  if (e.target === tModal) closeTimeoutModal();
+  if (e.target === bModal) closeBanModal();
+});
+</script>

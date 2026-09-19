@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title : 'Staff login — ClassChat' %></title>
+</head>
+<body>
+  <h1>Staff login</h1>
+  <% if (typeof error !== 'undefined' && error === 'invalid') { %>
+  <p>Invalid username or password, or not a staff account.</p>
+  <% } %>
+  <form action="/staff/login" method="post">
+    <p>
+      <label>Username</label><br>
+      <input type="text" name="username" required autocomplete="username">
+    </p>
+    <p>
+      <label>Password</label><br>
+      <input type="password" name="password" required autocomplete="current-password">
+    </p>
+    <p>
+      <button type="submit">Log in</button>
+    </p>
+  </form>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<div class="migration-screen">
+  <div class="migration-card">
+    <div class="migration-header">
+      <div class="logo">
+        <span class="logo-icon">💬</span>
+        <h1>ClassChat</h1>
+      </div>
+    </div>
+
+    <% if (step === 1) { %>
+      <div class="migration-step-content">
+        <div class="migration-alert-icon">⚠️</div>
+        <h2 class="migration-title">Your username is incompatible with ClassChat 3.0 and will need to be changed.</h2>
+        <div class="migration-diff-box">
+          <p class="migration-diff-text">
+            Changing username from <strong class="old-username"><%= currentUsername %></strong> to <strong class="new-username"><%= sanitizedUsername %></strong>
+          </p>
+        </div>
+        <div class="migration-actions">
+          <a href="/migrate-username?step=2" class="btn btn-primary btn-block">Continue</a>
+          <a href="/logout" class="btn btn-ghost btn-block">Sign Out</a>
+        </div>
+      </div>
+    <% } else if (step === 2) { %>
+      <div class="migration-step-content">
+        <h2 class="migration-title">To continue, please enter your new credentials.</h2>
+        <div class="migration-suggest-box">
+          <span class="migration-suggest-label">New username:</span>
+          <span class="migration-suggest-val"><%= sanitizedUsername %></span>
+        </div>
+
+        <% if (typeof error !== 'undefined' && error) { %>
+          <div class="form-error" style="margin-bottom: 16px;">
+            <% if (error === 'mismatch') { %>Usernames do not match.
+            <% } else if (error === 'invalid_username') { %>Username must be 2–30 characters and only contain lowercase letters, numbers, hyphens, or underscores.
+            <% } else if (error === 'username_taken') { %>That username is already taken. Please choose another.
+            <% } else if (error === 'invalid_password') { %>Incorrect password. Please enter your account password to confirm.
+            <% } else if (error === 'missing') { %>Please fill in all fields.
+            <% } else { %><%= error %><% } %>
+          </div>
+        <% } %>
+
+        <form action="/migrate-username" method="post" class="migration-form">
+          <div class="field">
+            <label for="new_username">Username</label>
+            <input type="text" id="new_username" name="username" value="<%= typeof enteredUsername !== 'undefined' && enteredUsername ? enteredUsername : sanitizedUsername %>" required autocomplete="username" minlength="2" maxlength="30">
+          </div>
+          <div class="field">
+            <label for="confirm_username">Confirm Username</label>
+            <input type="text" id="confirm_username" name="confirm_username" value="<%= typeof enteredConfirmUsername !== 'undefined' ? enteredConfirmUsername : '' %>" placeholder="Confirm new username" required autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="current_password">Password</label>
+            <input type="password" id="current_password" name="password" placeholder="Account password" required autocomplete="current-password">
+          </div>
+          <div class="migration-actions">
+            <button type="submit" class="btn btn-primary btn-block">Apply Changes</button>
+            <a href="/migrate-username?step=1" class="btn btn-ghost btn-block">Back</a>
+          </div>
+        </form>
+      </div>
+    <% } else if (step === 3) { %>
+      <div class="migration-step-content text-center">
+        <div class="migration-success-icon">✅</div>
+        <h2 class="migration-title">Thank you for applying your new username. For any further questions, please open a support ticket.</h2>
+        <div class="migration-actions" style="margin-top: 24px;">
+          <a href="/feed" class="btn btn-primary btn-block">Close</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>

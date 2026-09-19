@@ -1,0 +1,17 @@
+<div class="migration-screen">
+  <div class="migration-card text-center">
+    <div class="migration-header" style="justify-content: center;">
+      <div class="logo">
+        <span class="logo-icon">💬</span>
+        <h1>ClassChat</h1>
+      </div>
+    </div>
+    <div class="migration-step-content text-center">
+      <div class="migration-alert-icon" style="font-size: 36px; margin-bottom: 16px;">🚫</div>
+      <h2 class="migration-title" style="margin-bottom: 24px;"><%= typeof message !== 'undefined' ? message : 'This page is not available for your account.' %></h2>
+      <div class="migration-actions">
+        <a href="<%= typeof closeUrl !== 'undefined' ? closeUrl : '/feed' %>" class="btn btn-primary btn-block">Close</a>
+      </div>
+    </div>
+  </div>
+</div>

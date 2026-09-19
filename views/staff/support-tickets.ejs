@@ -1,0 +1,122 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support">Support</a>
+      <a href="/staff/dashboard" class="active">Staff</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %><% if (typeof district !== 'undefined' && district) { %> · <%= district %><% } %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="staff-page" style="max-width: 760px; margin: 0 auto; padding: 24px;">
+  <div class="staff-page-header">
+    <h1>Support Tickets Queue</h1>
+    <p class="staff-page-subtitle">Manage student inquiries, technical bug reports, and account recovery requests.</p>
+  </div>
+
+  <div class="staff-subnav">
+    <a href="/staff/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
+    <a href="/staff/support" class="btn btn-primary btn-sm">Support Queue (<%= typeof stats !== 'undefined' ? stats.open : 0 %> open)</a>
+    <a href="/staff/audit-log" class="btn btn-ghost btn-sm">Audit Log</a>
+    <a href="/staff/profile" class="btn btn-ghost btn-sm">Staff Profile</a>
+  </div>
+
+  <!-- KPI Stats -->
+  <div class="staff-stats" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+    <div class="staff-stat">
+      <div class="value"><%= stats.total %></div>
+      <div class="label">Total</div>
+    </div>
+    <div class="staff-stat">
+      <div class="value" style="color: #fbbf24;"><%= stats.open %></div>
+      <div class="label">Open</div>
+    </div>
+    <div class="staff-stat">
+      <div class="value" style="color: #60a5fa;"><%= stats.in_progress %></div>
+      <div class="label">In Progress</div>
+    </div>
+    <div class="staff-stat">
+      <div class="value" style="color: #c084fc;"><%= stats.waiting_on_user %></div>
+      <div class="label">Waiting</div>
+    </div>
+    <div class="staff-stat">
+      <div class="value" style="color: var(--success);"><%= stats.resolved %></div>
+      <div class="label">Resolved</div>
+    </div>
+  </div>
+
+  <!-- Status Filter Tabs -->
+  <div class="staff-filter-tabs">
+    <a href="/staff/support?status=all" class="staff-filter-tab <%= currentStatus === 'all' ? 'active' : '' %>">
+      All <span class="staff-filter-badge"><%= stats.total %></span>
+    </a>
+    <a href="/staff/support?status=open" class="staff-filter-tab <%= currentStatus === 'open' ? 'active' : '' %>">
+      Open <span class="staff-filter-badge"><%= stats.open %></span>
+    </a>
+    <a href="/staff/support?status=in_progress" class="staff-filter-tab <%= currentStatus === 'in_progress' ? 'active' : '' %>">
+      In Progress <span class="staff-filter-badge"><%= stats.in_progress %></span>
+    </a>
+    <a href="/staff/support?status=waiting_on_user" class="staff-filter-tab <%= currentStatus === 'waiting_on_user' ? 'active' : '' %>">
+      Waiting <span class="staff-filter-badge"><%= stats.waiting_on_user %></span>
+    </a>
+    <a href="/staff/support?status=resolved" class="staff-filter-tab <%= currentStatus === 'resolved' ? 'active' : '' %>">
+      Resolved <span class="staff-filter-badge"><%= stats.resolved %></span>
+    </a>
+    <a href="/staff/support?status=closed" class="staff-filter-tab <%= currentStatus === 'closed' ? 'active' : '' %>">
+      Closed <span class="staff-filter-badge"><%= stats.closed %></span>
+    </a>
+  </div>
+
+  <!-- Tickets List -->
+  <div class="staff-section" style="padding: 16px;">
+    <% if (tickets && tickets.length) { %>
+    <ul class="ticket-list">
+      <% tickets.forEach(function(t) { %>
+      <li>
+        <a href="/staff/support/ticket/<%= t.id %>" class="ticket-card">
+          <div class="ticket-card-info">
+            <div class="ticket-card-header">
+              <span class="ticket-id-tag">#<%= t.id %></span>
+              <span class="badge-category"><%= t.category %></span>
+              <span class="badge-prio prio-<%= t.priority %>"><%= t.priority %></span>
+              <span class="badge-status badge-<%= t.status %>"><%= t.status.replace(/_/g, ' ') %></span>
+              <span class="muted" style="font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px;">
+                <% if (t.user_avatar) { %>
+                <img src="<%= t.user_avatar %>" alt="" class="staff-avatar" style="width:20px;height:20px;">
+                <% } %>
+                <%= t.display_name ? t.display_name + ' (@' + t.username + ')' : '@' + t.username %>
+              </span>
+            </div>
+            <div class="ticket-card-title"><%= t.subject %></div>
+            <div class="ticket-card-meta">
+              Updated <%= t.updated_at_fmt || t.created_at_fmt %> · <%= t.message_count || 1 %> messages
+            </div>
+          </div>
+          <div>
+            <span class="btn btn-ghost btn-sm">Open Ticket →</span>
+          </div>
+        </a>
+      </li>
+      <% }); %>
+    </ul>
+    <% } else { %>
+    <div style="padding: 36px 20px; text-align: center;" class="muted">
+      No tickets found matching the "<strong><%= currentStatus %></strong>" filter.
+    </div>
+    <% } %>
+  </div>
+</main>

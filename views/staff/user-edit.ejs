@@ -1,0 +1,271 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support">Support</a>
+      <a href="/staff/dashboard" class="active">Staff</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %><% if (typeof district !== 'undefined' && district) { %> · <%= district %><% } %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="staff-page" style="max-width: 680px; margin: 0 auto; padding: 24px;">
+  <p style="margin: 0 0 16px;"><a href="/staff/dashboard" class="btn btn-ghost btn-sm">← Back to Dashboard</a></p>
+
+  <% if (typeof success !== 'undefined' && success) { %>
+  <div style="background: rgba(34, 197, 94, 0.15); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 20px; font-weight: 500;">
+    ✓ User updated successfully!
+  </div>
+  <% } %>
+
+  <% if (typeof error !== 'undefined' && error) { %>
+  <div style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 20px;">
+    <% if (error === 'username_taken') { %>
+      That username is already taken by another user.
+    <% } else if (error === 'username_short') { %>
+      Username must be at least 2 characters long.
+    <% } else if (error === 'username_invalid') { %>
+      Username can only contain letters, numbers, and underscores.
+    <% } else if (error === 'student_id_required') { %>
+      Student ID / School ID is required and cannot be empty.
+    <% } else if (error === 'password_short') { %>
+      Password must be at least 6 characters long.
+    <% } else { %>
+      An error occurred while updating the user.
+    <% } %>
+  </div>
+  <% } %>
+
+  <div class="staff-section" style="padding: 28px;">
+    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--border);">
+      <% if (targetUser.avatar_path) { %>
+      <img src="<%= targetUser.avatar_path %>" alt="" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover;">
+      <% } else { %>
+      <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700;">
+        <%= (targetUser.username || '?').charAt(0).toUpperCase() %>
+      </div>
+      <% } %>
+      <div>
+        <h1 style="margin: 0 0 4px; font-size: 1.4rem;">Edit User: @<%= targetUser.username %></h1>
+        <p class="muted" style="margin: 0;">User ID #<%= targetUser.id %> · Member since <%= targetUser.created_at || 'N/A' %></p>
+      </div>
+    </div>
+
+    <form action="/staff/users/<%= targetUser.id %>/edit" method="post" enctype="multipart/form-data">
+      <!-- Profile Picture (PFP) -->
+      <div class="form-group-custom" style="margin-bottom: 22px;">
+        <label>Profile Picture (PFP)</label>
+        <div style="display: flex; align-items: center; gap: 18px; margin-top: 8px; flex-wrap: wrap;">
+          <div id="avatar-preview-wrap">
+            <% if (targetUser.avatar_path) { %>
+            <img id="avatar-preview-img" src="<%= targetUser.avatar_path %>" alt="PFP" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border);">
+            <% } else { %>
+            <div id="avatar-preview-img" style="width: 64px; height: 64px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 700; border: 2px solid var(--border);">
+              <%= (targetUser.username || '?').charAt(0).toUpperCase() %>
+            </div>
+            <% } %>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label class="btn btn-ghost btn-sm" style="cursor: pointer; width: fit-content;">
+              <span>📁 Upload New Picture</span>
+              <input type="file" name="avatar" accept="image/*" style="display: none;" onchange="handlePfpChange(this)">
+            </label>
+            <% if (targetUser.avatar_path) { %>
+            <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); cursor: pointer;">
+              <input type="checkbox" name="remove_avatar" value="1" style="width: auto;">
+              <span>Remove current profile picture</span>
+            </label>
+            <% } %>
+            <span class="muted" style="font-size: 0.78rem;">Supported formats: JPG, PNG, GIF, WebP (Max 2MB)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <!-- Username -->
+        <div class="form-group-custom">
+          <label for="username">Username (@handle) <span style="color: #ef4444;">*</span></label>
+          <input type="text" id="username" name="username" value="<%= targetUser.username %>" required minlength="2" maxlength="30" placeholder="e.g. johndoe">
+          <span class="muted" style="font-size: 0.78rem; display: block; margin-top: 4px;">Platform-wide unique username handle.</span>
+        </div>
+
+        <!-- Student ID -->
+        <div class="form-group-custom">
+          <label for="school_id">Student ID / School ID <span style="color: #ef4444;">*</span></label>
+          <input type="text" id="school_id" name="school_id" value="<%= targetUser.school_id || '' %>" required placeholder="e.g. 1029384">
+          <span class="muted" style="font-size: 0.78rem; display: block; margin-top: 4px;">Student ID number for school verification.</span>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <!-- Display Name -->
+        <div class="form-group-custom">
+          <label for="display_name">Display Name</label>
+          <input type="text" id="display_name" name="display_name" value="<%= targetUser.display_name || '' %>" maxlength="50" placeholder="e.g. John Doe">
+          <span class="muted" style="font-size: 0.78rem; display: block; margin-top: 4px;">Friendly name displayed above handle.</span>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group-custom">
+          <label for="password">Change / Reset Password</label>
+          <input type="password" id="password" name="password" minlength="6" placeholder="Leave blank to keep unchanged">
+          <span class="muted" style="font-size: 0.78rem; display: block; margin-top: 4px;">Leave blank if you don't want to reset it.</span>
+        </div>
+      </div>
+
+      <!-- Bio -->
+      <div class="form-group-custom" style="margin-bottom: 22px;">
+        <label for="bio">Biography (Bio)</label>
+        <textarea id="bio" name="bio" rows="3" maxlength="300" placeholder="Tell other students about this user..."><%= targetUser.bio || '' %></textarea>
+        <span class="muted" style="font-size: 0.78rem; display: block; margin-top: 4px;">Public profile bio (max 300 characters).</span>
+      </div>
+
+      <!-- Staff Role -->
+      <div class="form-group-custom" style="background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 24px;">
+        <label style="margin-bottom: 6px;">Staff Permissions &amp; Access</label>
+        <label style="display: flex; align-items: center; gap: 10px; font-weight: normal; cursor: pointer; margin: 0;">
+          <input type="checkbox" name="is_staff" value="1" <%= targetUser.is_staff ? 'checked' : '' %> style="width: auto;">
+          <span style="font-weight: 500;">Grant Staff / Moderator Role</span>
+        </label>
+        <span class="muted" style="font-size: 0.8rem; display: block; margin-top: 4px;">
+          Grants access to moderation dashboard, classes, support tickets, and user administration.
+        </span>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); padding-top: 20px;">
+        <a href="/staff/dashboard" class="btn btn-ghost">Cancel</a>
+        <button type="submit" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">Save Changes</button>
+      </div>
+    </form>
+
+    <!-- Moderation & Sanctions Section -->
+    <% 
+       const targetIsOwner = ['emoticonyt', 'doriandelvalle'].includes((targetUser.username || '').toLowerCase());
+       const viewerIsOwner = ['emoticonyt', 'doriandelvalle'].includes((username || '').toLowerCase());
+       const isTimedOut = targetUser.timeout_until && new Date(targetUser.timeout_until).getTime() > Date.now();
+    %>
+    <% if (!targetIsOwner) { %>
+    <div style="margin-top: 32px; border-top: 1px solid var(--border); padding-top: 24px;">
+      <h3 style="margin: 0 0 4px; font-size: 1.1rem; color: #f59e0b;">Account Sanctions &amp; Moderation</h3>
+      <p class="muted" style="font-size: 0.82rem; margin-bottom: 16px;">Manage temporary timeouts and account bans for @<%= targetUser.username %>.</p>
+
+      <!-- Status Overview -->
+      <div style="background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 18px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-size: 0.85rem; font-weight: 600;">Current Sanction Status</div>
+            <div style="font-size: 0.8rem; margin-top: 4px;" class="muted">
+              <% if (targetUser.is_banned) { %>
+                <span style="color: #ef4444; font-weight: 600;">🚫 Account Banned:</span> <%= targetUser.ban_reason || 'No reason provided.' %>
+              <% } else if (isTimedOut) { %>
+                <span style="color: #f59e0b; font-weight: 600;">⏳ Timed Out:</span> Until <%= new Date(targetUser.timeout_until).toLocaleString() %> (<%= targetUser.timeout_reason || 'No reason' %>)
+              <% } else { %>
+                <span style="color: #10b981; font-weight: 600;">✓ In Good Standing</span> (No active restrictions)
+              <% } %>
+            </div>
+          </div>
+          <div>
+            <% if (isTimedOut && (!targetUser.is_staff || viewerIsOwner)) { %>
+            <form action="/staff/users/<%= targetUser.id %>/untimeout" method="post" style="display: inline;">
+              <button type="submit" class="btn btn-ghost btn-sm" style="color: #f59e0b;">Clear Timeout</button>
+            </form>
+            <% } %>
+            <% if (targetUser.is_banned && viewerIsOwner) { %>
+            <form action="/staff/users/<%= targetUser.id %>/unban" method="post" style="display: inline;">
+              <button type="submit" class="btn btn-ghost btn-sm" style="color: #10b981;">Unban Account</button>
+            </form>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeout Form -->
+      <% if (!targetUser.is_staff || viewerIsOwner) { %>
+      <div style="background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 18px;">
+        <h4 style="margin: 0 0 10px; font-size: 0.95rem;">
+          <%= targetUser.is_staff ? 'Moderator Timeout' : 'Apply Timeout' %>
+        </h4>
+        <form action="/staff/users/<%= targetUser.id %>/timeout" method="post" style="margin: 0;">
+          <div class="form-row">
+            <div class="form-group-custom">
+              <label for="edit_duration">Duration</label>
+              <select id="edit_duration" name="duration" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text);">
+                <option value="5">5 Minutes</option>
+                <option value="15" selected>15 Minutes</option>
+                <option value="60">1 Hour</option>
+                <option value="1440">24 Hours (1 Day)</option>
+                <option value="10080">7 Days</option>
+              </select>
+            </div>
+            <div class="form-group-custom">
+              <label for="edit_timeout_reason">Reason</label>
+              <input type="text" id="edit_timeout_reason" name="reason" placeholder="e.g. Inappropriate conduct" required style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text);">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 10px; background: #f59e0b; border-color: #f59e0b; color: #000; font-weight: 600;">
+            Apply Timeout
+          </button>
+        </form>
+      </div>
+      <% } else { %>
+      <p class="muted" style="font-size: 0.8rem; margin-bottom: 18px;">
+        🔒 Moderator timeouts can only be issued through the <strong>@emoticonyt</strong> account.
+      </p>
+      <% } %>
+
+      <!-- Ban Section (Exclusively @emoticonyt) -->
+      <% if (viewerIsOwner) { %>
+      <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-sm); padding: 16px;">
+        <h4 style="margin: 0 0 6px; font-size: 0.95rem; color: #ef4444;">Permanent Account Ban (Owner Only)</h4>
+        <p class="muted" style="font-size: 0.8rem; margin-top: 0; margin-bottom: 12px;">Permanently terminates the account and prevents login or access.</p>
+        <% if (!targetUser.is_banned) { %>
+        <form action="/staff/users/<%= targetUser.id %>/ban" method="post" onsubmit="return confirm('Permanently ban @<%= targetUser.username %>?');">
+          <div class="form-group-custom" style="margin-bottom: 10px;">
+            <label for="edit_ban_reason">Ban Reason</label>
+            <input type="text" id="edit_ban_reason" name="reason" placeholder="e.g. Repeated violations, safety hazard..." required style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text);">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="background: #ef4444; border-color: #ef4444; color: #fff; font-weight: 600;">
+            Ban User Account
+          </button>
+        </form>
+        <% } else { %>
+        <form action="/staff/users/<%= targetUser.id %>/unban" method="post" style="display:inline;">
+          <button type="submit" class="btn btn-ghost btn-sm" style="color: #10b981;" onclick="return confirm('Unban @<%= targetUser.username %>?');">Unban Account</button>
+        </form>
+        <% } %>
+      </div>
+      <% } else { %>
+      <p class="muted" style="font-size: 0.8rem;">
+        🔒 Permanent account bans can only be issued through the <strong>@emoticonyt</strong> account.
+      </p>
+      <% } %>
+    </div>
+    <% } %>
+  </div>
+</main>
+
+<script>
+function handlePfpChange(input) {
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    const previewWrap = document.getElementById('avatar-preview-wrap');
+    if (previewWrap && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      previewWrap.innerHTML = `<img src="${url}" alt="Preview" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent);">`;
+    }
+  }
+}
+</script>

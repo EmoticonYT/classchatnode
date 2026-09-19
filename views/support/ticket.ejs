@@ -1,0 +1,102 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support" class="active">Support</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="support-page" style="max-width: 760px; margin: 0 auto; padding: 24px;">
+  <p style="margin: 0 0 16px;"><a href="/support" class="btn btn-ghost btn-sm">← Back to Help Center</a></p>
+
+  <div class="ticket-detail-header">
+    <div class="ticket-meta-bar">
+      <div class="ticket-id-tag">Ticket #<%= ticket.id %></div>
+      <div class="ticket-tags">
+        <span class="badge-category"><%= ticket.category %></span>
+        <span class="badge-prio prio-<%= ticket.priority %>"><%= ticket.priority %> Priority</span>
+        <span class="badge-status badge-<%= ticket.status %>"><%= ticket.status.replace(/_/g, ' ') %></span>
+      </div>
+    </div>
+
+    <h1 class="ticket-title-main"><%= ticket.subject %></h1>
+
+    <div class="ticket-info-footer">
+      <div>
+        <span>Opened <%= ticket.created_at_fmt %></span>
+        <% if (ticket.resolved_at_fmt) { %>
+        <span style="color: var(--success); font-weight: 600;"> · Resolved <%= ticket.resolved_at_fmt %></span>
+        <% } %>
+      </div>
+      <div>
+        <% if (ticket.status !== 'resolved' && ticket.status !== 'closed') { %>
+        <form action="/support/ticket/<%= ticket.id %>/resolve" method="post" style="display:inline;" onsubmit="return confirm('Mark this support ticket as resolved?');">
+          <button type="submit" class="btn btn-sm btn-ghost" style="color: var(--success); border-color: rgba(34, 197, 94, 0.4);">✓ Mark as Resolved</button>
+        </form>
+        <% } else { %>
+        <span style="color: var(--success); font-weight: 600; font-size: 0.85rem;">✓ Ticket Resolved</span>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conversation Thread -->
+  <div class="ticket-thread">
+    <% if (messages && messages.length) { %>
+    <% messages.forEach(function(msg) { %>
+    <div class="ticket-message <%= msg.is_staff ? 'from-staff' : '' %>">
+      <div class="message-author-bar">
+        <div class="message-author-info">
+          <% if (msg.avatar_path) { %>
+          <img src="<%= msg.avatar_path %>" alt="" class="staff-avatar">
+          <% } else { %>
+          <span class="staff-avatar staff-avatar-initial"><%= (msg.display_name || msg.username || '?').charAt(0).toUpperCase() %></span>
+          <% } %>
+          <span class="message-author-name"><%= msg.display_name || msg.username %> <span class="muted" style="font-size: 0.85em; font-weight: normal;">@<%= msg.username %></span></span>
+          <% if (msg.is_staff) { %>
+          <span class="staff-badge">Staff Support</span>
+          <% } %>
+        </div>
+        <span class="muted" style="font-size: 0.8rem;"><%= msg.created_at_fmt %></span>
+      </div>
+      <div class="message-body"><%= msg.body %></div>
+    </div>
+    <% }); %>
+    <% } else { %>
+    <p class="muted">No messages in this ticket yet.</p>
+    <% } %>
+  </div>
+
+  <!-- Reply Form -->
+  <% if (ticket.status !== 'closed') { %>
+  <div class="reply-card">
+    <h3>Reply to Ticket</h3>
+    <form action="/support/ticket/<%= ticket.id %>/reply" method="post">
+      <textarea name="body" class="reply-textarea" placeholder="Type your response or additional details here..." required></textarea>
+      <div style="display:flex;justify-content:flex-end;gap:12px;">
+        <button type="submit" class="btn btn-primary" style="padding:8px 20px;">Send Message</button>
+      </div>
+    </form>
+  </div>
+  <% } else { %>
+  <div class="reply-card" style="text-align:center;color:var(--text-muted);">
+    This ticket has been closed. If you still need help, please <a href="/support/new">open a new ticket</a>.
+  </div>
+  <% } %>
+</main>

@@ -1,0 +1,190 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages" class="active">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/search">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="conversation-page">
+  <div class="chat-container">
+    <div class="conversation-header">
+      <div class="chat-header-left">
+        <a href="/messages" class="chat-back-btn" title="Back to messages">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </a>
+        <div class="chat-header-user">
+          <div class="chat-avatar-wrap">
+            <% if (other.avatar_path) { %>
+            <img src="<%= other.avatar_path %>" alt="" class="dm-avatar">
+            <% } else { %>
+            <div class="dm-avatar dm-avatar-initial"><%= (other.display_name || other.username || '?').charAt(0).toUpperCase() %></div>
+            <% } %>
+            <span id="user-online-badge" class="status-dot <%= isOnline ? 'online' : 'offline' %>" title="<%= isOnline ? 'Online now' : 'Offline' %>"></span>
+          </div>
+          <div class="chat-user-meta">
+            <a href="/u/<%= other.username %>" class="chat-user-title">
+              <strong class="chat-user-name"><%= other.display_name || other.username %></strong>
+              <span class="chat-user-handle">@<%= other.username %></span>
+            </a>
+            <span id="user-online-text" class="chat-online-text <%= isOnline ? 'online' : 'offline' %>"><%= isOnline ? 'Active now' : 'Offline' %></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-header-actions">
+        <div class="call-dropdown-wrap">
+          <details class="call-details">
+            <summary class="dropdown-trigger btn btn-primary btn-sm">📞 Call ▾</summary>
+            <div class="dropdown-panel">
+              <a href="/call/<%= encodeURIComponent(other.username) %>">📹 Video call</a>
+              <a href="/call/<%= encodeURIComponent(other.username) %>?audio=1">🎧 Audio call</a>
+            </div>
+          </details>
+        </div>
+        <a href="/u/<%= other.username %>" class="btn btn-ghost btn-sm" title="View Profile">Profile</a>
+        <% if (typeof isMuted !== 'undefined' && isMuted) { %>
+        <form action="/conversations/<%= encodeURIComponent(other.username) %>/unmute" method="post" style="display:inline;">
+          <button type="submit" class="btn btn-ghost btn-sm" title="Unmute notifications">Unmute</button>
+        </form>
+        <% } else { %>
+        <form action="/conversations/<%= encodeURIComponent(other.username) %>/mute" method="post" style="display:inline;">
+          <button type="submit" class="btn btn-ghost btn-sm" title="Mute notifications">Mute</button>
+        </form>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="conversation-feed-wrapper">
+      <div id="message-feed" class="conversation-messages" data-current-user="<%= username %>">
+        <div id="load-more-container" class="load-more-container" style="<%= (typeof hasMore !== 'undefined' && hasMore) ? '' : 'display:none;' %>">
+          <button type="button" id="btn-load-more" class="btn btn-ghost btn-sm btn-load-more">↑ Load older messages</button>
+          <div id="loading-older-spinner" class="loading-older-spinner" style="display:none;">Loading older messages...</div>
+        </div>
+        <% messages.forEach(function(m) { %>
+        <div class="dm-message <%= m.sender_id === userId ? 'dm-sent' : 'dm-received' %>" data-message-id="<%= m.id %>">
+          <% if (m.sender_id !== userId) { %>
+            <% if (m.sender_avatar) { %>
+            <img src="<%= m.sender_avatar %>" alt="" class="dm-avatar">
+            <% } else { %>
+            <div class="dm-avatar dm-avatar-initial"><%= (m.sender_display_name || m.sender_username || '?').charAt(0).toUpperCase() %></div>
+            <% } %>
+          <% } %>
+          <div class="dm-bubble">
+            <% if (m.reply_to_body) { %>
+            <div class="dm-reply-to muted"><%= m.reply_to_body %><% if (m.reply_to_body.length >= 100) { %>…<% } %></div>
+            <% } %>
+            <% if (m.sender_id !== userId) { %><span class="dm-sender"><strong><%= m.sender_display_name || m.sender_username %></strong><% if (m.sender_display_name) { %> <span class="muted" style="font-size: 0.85em; font-weight: normal;">@<%= m.sender_username %></span><% } %></span><% } %>
+            <% if (m.body) { %><p class="dm-body"><%= m.body %></p><% } %>
+            <% if (m.image_path) { %>
+            <div class="dm-attach"><img src="<%= m.image_path %>" alt="" class="dm-attach-img" loading="lazy"></div>
+            <% } %>
+            <% if (m.file_path) { %>
+            <p class="dm-attach"><a href="<%= m.file_path %>" target="_blank" rel="noopener" class="dm-attach-link">📎 Download attachment</a></p>
+            <% } %>
+            <% if (m.video_path) { %>
+            <div class="dm-attach"><video src="<%= m.video_path %>" controls class="dm-attach-video"></video></div>
+            <% } %>
+            <div class="dm-footer">
+              <span class="dm-time muted"><%= m.created_at_fmt || m.created_at %></span>
+              <div class="dm-actions">
+                <% if (typeof userId !== 'undefined' && userId) { %>
+                <button type="button" class="dm-action-btn reply-to-btn" data-message-id="<%= m.id %>" data-reply-body="<%= (m.body || '').slice(0, 50).replace(/"/g, '&quot;') %>">Reply</button>
+                <form action="/messages/<%= m.id %>/pin" method="post" class="dm-action-form inline">
+                  <button type="submit" class="dm-action-btn"><%= typeof pinnedMessageId !== 'undefined' && pinnedMessageId === m.id ? '📌 Pinned' : 'Pin' %></button>
+                </form>
+                <% if (m.sender_id === userId) { %>
+                <button type="button" class="dm-action-btn dm-delete-btn" onclick="deleteChatMsg(<%= m.id %>)">Delete</button>
+                <% } %>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </div>
+        <% }); %>
+        <% if (messages.length === 0) { %>
+        <div class="conversation-empty muted">
+          <span class="empty-icon">👋</span>
+          <p>No messages yet. Say hello to @<%= other.username %>!</p>
+        </div>
+        <% } %>
+      </div>
+
+      <button type="button" id="new-message-pill" class="new-message-pill" style="display:none;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        New messages
+      </button>
+
+      <div id="typing-indicator" class="typing-indicator" style="display:none;">
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+        <span id="typing-text" class="typing-text">@<%= other.username %> is typing...</span>
+      </div>
+    </div>
+
+    <form id="conversation-form" action="/messages" method="post" enctype="multipart/form-data" class="conversation-form"
+          data-current-user="<%= username %>"
+          data-current-user-id="<%= userId %>"
+          data-other-user="<%= other.username %>"
+          data-other-user-id="<%= other.id %>">
+      <input type="hidden" name="to" value="<%= other.username %>">
+      <input type="hidden" name="reply_to" id="reply_to" value="">
+      <% if (typeof error !== 'undefined' && error === 'empty') { %>
+      <p class="form-error">Message or attachment required.</p>
+      <% } %>
+      <div id="reply-preview" class="reply-preview" style="display:none;">
+        <div class="reply-preview-content">
+          <span class="reply-preview-label">Replying:</span>
+          <span id="reply-preview-text" class="reply-preview-text"></span>
+        </div>
+        <button type="button" id="reply-cancel" class="btn-ghost-sm" title="Cancel reply">&times;</button>
+      </div>
+      <div id="compose-preview-tray" class="compose-preview-tray" style="display:none;"></div>
+      <div class="conversation-compose">
+        <div class="compose-row">
+          <div class="compose-attach-group">
+            <label class="file-label btn-attach" title="Attach image">
+              <input type="file" name="image" accept="image/*" class="file-input">
+              <span>📷</span>
+            </label>
+            <label class="file-label btn-attach" title="Attach file">
+              <input type="file" name="file" class="file-input">
+              <span>📎</span>
+            </label>
+            <label class="file-label btn-attach" title="Attach video">
+              <input type="file" name="video" accept="video/*" class="file-input">
+              <span>🎬</span>
+            </label>
+          </div>
+          <div class="compose-input-wrapper">
+            <textarea name="body" id="msg-body" placeholder="Message @<%= other.username %>..." rows="1" maxlength="2000"></textarea>
+          </div>
+          <button type="submit" id="btn-send" class="btn btn-primary btn-chat-send" title="Send (Enter)">
+            <span>Send</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+        <div class="compose-hint muted">
+          <span>Enter to send · Shift+Enter for new line</span>
+          <span>Max 5MB per file</span>
+        </div>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script src="/js/chat.js"></script>

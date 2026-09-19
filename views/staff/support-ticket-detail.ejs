@@ -1,0 +1,117 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support">Support</a>
+      <a href="/staff/dashboard" class="active">Staff</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %><% if (typeof district !== 'undefined' && district) { %> · <%= district %><% } %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="staff-page" style="max-width: 760px; margin: 0 auto; padding: 24px;">
+  <p style="margin: 0 0 16px;"><a href="/staff/support" class="btn btn-ghost btn-sm">← Back to All Tickets</a></p>
+
+  <div class="ticket-detail-header">
+    <div class="ticket-meta-bar">
+      <div class="ticket-id-tag">Ticket #<%= ticket.id %></div>
+      <div class="ticket-tags">
+        <span class="badge-category"><%= ticket.category %></span>
+        <span class="badge-prio prio-<%= ticket.priority %>"><%= ticket.priority %> Priority</span>
+        <span class="badge-status badge-<%= ticket.status %>"><%= ticket.status.replace(/_/g, ' ') %></span>
+      </div>
+    </div>
+    <h1 class="ticket-title-main"><%= ticket.subject %></h1>
+    <div class="ticket-info-footer">
+      <div>
+        <span>Opened by <a href="/u/<%= ticket.username %>" style="font-weight: 600;"><%= ticket.display_name || ticket.username %></a> <span class="muted">(@<%= ticket.username %>)</span> on <%= ticket.created_at_fmt %></span>
+        <% if (ticket.resolved_at_fmt) { %>
+        <span style="color: var(--success); font-weight: 600;"> · Resolved <%= ticket.resolved_at_fmt %></span>
+        <% } %>
+      </div>
+      <div>
+        <a href="#reply-form" class="btn btn-primary btn-sm">Reply ↓</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status & Requester Sidebar Card -->
+  <div class="staff-section" style="padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <div>
+      <h3 style="margin: 0 0 10px; font-size: 1rem;">Update Status</h3>
+      <form action="/staff/support/ticket/<%= ticket.id %>/status" method="post">
+        <div class="form-group-custom" style="margin-bottom: 10px;">
+          <select id="status-select" name="status" class="form-control-custom">
+            <option value="open" <%= ticket.status === 'open' ? 'selected' : '' %>>Open (Awaiting review)</option>
+            <option value="in_progress" <%= ticket.status === 'in_progress' ? 'selected' : '' %>>In Progress</option>
+            <option value="waiting_on_user" <%= ticket.status === 'waiting_on_user' ? 'selected' : '' %>>Waiting on User</option>
+            <option value="resolved" <%= ticket.status === 'resolved' ? 'selected' : '' %>>Resolved</option>
+            <option value="closed" <%= ticket.status === 'closed' ? 'selected' : '' %>>Closed</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Save Status</button>
+      </form>
+    </div>
+    <div style="border-left: 1px solid var(--border); padding-left: 20px;">
+      <h3 style="margin: 0 0 10px; font-size: 1rem;">Student Details</h3>
+      <p class="muted" style="margin: 0 0 4px; font-size: 0.85rem;">Account: <a href="/u/<%= ticket.username %>"><%= ticket.display_name ? ticket.display_name + ' (@' + ticket.username + ')' : '@' + ticket.username %></a></p>
+      <% if (ticket.school_id) { %>
+      <p class="muted" style="margin: 0 0 4px; font-size: 0.85rem;">School ID: <%= ticket.school_id %></p>
+      <% } %>
+      <% if (ticket.school) { %>
+      <p class="muted" style="margin: 0 0 4px; font-size: 0.85rem;">School: <%= ticket.school %></p>
+      <% } %>
+      <a href="/staff/users/<%= ticket.user_id %>/edit" class="btn btn-ghost btn-sm" style="margin-top: 8px;">Edit User Account</a>
+    </div>
+  </div>
+
+  <!-- Ticket Conversation -->
+  <div class="ticket-thread">
+    <% if (messages && messages.length) { %>
+    <% messages.forEach(function(msg) { %>
+    <div class="ticket-message <%= msg.is_staff ? 'from-staff' : '' %>">
+      <div class="message-author-bar">
+        <div class="message-author-info">
+          <% if (msg.avatar_path) { %>
+          <img src="<%= msg.avatar_path %>" alt="" class="staff-avatar">
+          <% } else { %>
+          <span class="staff-avatar staff-avatar-initial"><%= (msg.display_name || msg.username || '?').charAt(0).toUpperCase() %></span>
+          <% } %>
+          <span class="message-author-name"><%= msg.display_name || msg.username %> <span class="muted" style="font-size: 0.85em; font-weight: normal;">@<%= msg.username %></span></span>
+          <% if (msg.is_staff) { %>
+          <span class="staff-badge">Staff Support</span>
+          <% } %>
+        </div>
+        <span class="muted" style="font-size: 0.8rem;"><%= msg.created_at_fmt %></span>
+      </div>
+      <div class="message-body"><%= msg.body %></div>
+    </div>
+    <% }); %>
+    <% } %>
+  </div>
+
+  <!-- Staff Reply Form -->
+  <div class="reply-card" id="reply-form">
+    <h3>Reply as Staff</h3>
+    <form action="/staff/support/ticket/<%= ticket.id %>/reply" method="post">
+      <textarea name="body" class="reply-textarea" placeholder="Type your response to the student here..." rows="4" required></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <span class="muted" style="font-size:0.85rem;">Replying as staff user @<%= username %></span>
+        <button type="submit" class="btn btn-primary" style="padding:10px 24px;font-weight:600;">Send Staff Reply</button>
+      </div>
+    </form>
+  </div>
+</main>

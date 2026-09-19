@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Maintenence Login — ClassChat</title>
+</head>
+<body>
+  <h1>Staff Maintenence Login</h1>
+  <div id="error" style="display: none;"></div>
+  <form id="login-form" action="/staff/login" method="post">
+    <p>
+      <label for="username">Username</label><br>
+      <input type="text" id="username" name="username" required autocomplete="username">
+    </p>
+    <p>
+      <label for="password">Password</label><br>
+      <input type="password" id="password" name="password" required autocomplete="current-password">
+    </p>
+    <p>
+      <button type="submit">Login</button>
+    </p>
+  </form>
+  <script>
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('error') === 'invalid') {
+        var el = document.getElementById('error');
+        el.textContent = 'Invalid username or password, or not a staff account.';
+        el.style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<div class="join-screen">
+  <!-- Main Timeout Card -->
+  <div id="main-card" class="auth-card timeout-card" style="max-width: 440px; text-align: center; <%= (typeof showAppeal !== 'undefined' && showAppeal) ? 'display: none;' : '' %>">
+    <% if (typeof appealed !== 'undefined' && appealed) { %>
+    <div class="appeal-banner" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #10b981; padding: 12px 14px; border-radius: var(--radius-sm); font-size: 0.88rem; margin-bottom: 18px; text-align: left; line-height: 1.45;">
+      ✓ <strong>Appeal Submitted:</strong> Your timeout appeal has been received with high urgency. Staff will review it shortly.
+    </div>
+    <% } %>
+
+    <div class="logo">
+      <span class="logo-icon">⏳</span>
+      <h1>ClassChat</h1>
+      <p class="tagline highlight-version" style="color: #f59e0b; font-weight: 600; margin-top: 4px;">Temporarily Timed Out</p>
+      <p class="muted" style="margin-top: 6px; font-size: 0.88rem;">Logged in as <strong>@<%= username %></strong></p>
+    </div>
+
+    <div class="timeout-reason-container" style="background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin: 20px 0; text-align: left;">
+      <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #f59e0b; margin-bottom: 4px;">Reason for timeout</div>
+      <div style="color: var(--text); font-size: 0.92rem; line-height: 1.45; word-break: break-word;"><%= timeout_reason || 'Violation of community or classroom guidelines.' %></div>
+    </div>
+
+    <div class="timer-container" style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 18px 16px; margin-bottom: 24px;">
+      <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; margin-bottom: 6px;">Time Remaining</div>
+      <div id="countdown" style="font-size: 2.4rem; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: #fbbf24; letter-spacing: 0.04em;">--:--:--</div>
+      <div style="margin-top: 8px; font-size: 0.82rem; color: var(--text-muted);">
+        Access restores at: <span id="expire-date" style="color: var(--text);"><%= timeout_until ? new Date(timeout_until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Soon' %></span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <a href="/feed" id="check-btn" class="btn btn-primary btn-block">Check Access</a>
+      <button type="button" id="open-appeal-btn" class="btn btn-secondary btn-block" style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text);">Appeal Timeout</button>
+      <a href="/logout" class="btn btn-ghost btn-block">Log Out</a>
+    </div>
+  </div>
+
+  <!-- Appeal Window (Matches Login Screen Design) -->
+  <div id="appeal-card" class="auth-card" style="max-width: 440px; <%= (typeof showAppeal !== 'undefined' && showAppeal) ? '' : 'display: none;' %>">
+    <div class="logo">
+      <span class="logo-icon">⚖️</span>
+      <h1>Appeal (Timeout)</h1>
+      <p class="tagline">Submit an appeal for your account timeout</p>
+    </div>
+
+    <% if (typeof error !== 'undefined' && error === 'missing') { %>
+    <p class="form-error">Please fill in both the title and subject.</p>
+    <% } %>
+
+    <form action="/appeal" method="post" class="auth-form">
+      <input type="hidden" name="type" value="timeout">
+
+      <div class="field" style="text-align: left;">
+        <label for="appeal_title">Title</label>
+        <input type="text" id="appeal_title" name="title" placeholder="Title" required autocomplete="off">
+      </div>
+
+      <div class="field" style="text-align: left;">
+        <label for="appeal_subject">Subject</label>
+        <textarea id="appeal_subject" name="subject" placeholder="Subject" rows="4" required></textarea>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button type="button" id="cancel-appeal-btn" class="btn btn-ghost" style="flex: 1;">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="flex: 1;">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  const untilIso = <%- JSON.stringify(timeout_until || '') %>;
+  const targetTime = untilIso ? new Date(untilIso).getTime() : 0;
+  const countdownEl = document.getElementById('countdown');
+  const checkBtn = document.getElementById('check-btn');
+
+  function updateTimer() {
+    if (!countdownEl || !checkBtn) return;
+    const now = Date.now();
+    const diff = targetTime - now;
+
+    if (diff <= 0) {
+      countdownEl.textContent = '00:00:00';
+      countdownEl.style.color = 'var(--success, #10b981)';
+      checkBtn.textContent = 'Timeout Expired — Enter Site';
+      checkBtn.style.background = 'var(--success, #10b981)';
+      checkBtn.style.borderColor = 'var(--success, #10b981)';
+      setTimeout(() => {
+        window.location.href = '/feed';
+      }, 1200);
+      return;
+    }
+
+    const totalSec = Math.floor(diff / 1000);
+    const hours = Math.floor(totalSec / 3600);
+    const minutes = Math.floor((totalSec % 3600) / 60);
+    const seconds = totalSec % 60;
+
+    const hStr = hours > 0 ? (hours < 10 ? '0' + hours : hours) + ':' : '';
+    const mStr = (minutes < 10 ? '0' + minutes : minutes) + ':';
+    const sStr = seconds < 10 ? '0' + seconds : seconds;
+
+    countdownEl.textContent = hStr + mStr + sStr;
+  }
+
+  updateTimer();
+  setInterval(updateTimer, 1000);
+
+  // Appeal View Toggling
+  const mainCard = document.getElementById('main-card');
+  const appealCard = document.getElementById('appeal-card');
+  const openAppealBtn = document.getElementById('open-appeal-btn');
+  const cancelAppealBtn = document.getElementById('cancel-appeal-btn');
+
+  if (openAppealBtn && mainCard && appealCard) {
+    openAppealBtn.addEventListener('click', function() {
+      mainCard.style.display = 'none';
+      appealCard.style.display = 'block';
+      const titleInput = document.getElementById('appeal_title');
+      if (titleInput) titleInput.focus();
+    });
+  }
+
+  if (cancelAppealBtn && mainCard && appealCard) {
+    cancelAppealBtn.addEventListener('click', function() {
+      appealCard.style.display = 'none';
+      mainCard.style.display = 'block';
+    });
+  }
+})();
+</script>

@@ -1,0 +1,184 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/messages">Messages</a>
+      <a href="/call/<%= other.username %>" class="active">Video call</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+    </div>
+  </div>
+</header>
+<main class="call-page">
+  <div class="call-container">
+    <h1 class="call-title"><%= incoming ? 'Incoming call from' : 'Calling' %> @<%= other.username %></h1>
+    <p id="call-status" class="call-status"><%= incoming ? 'Connecting...' : 'Starting call...' %></p>
+    <div class="call-videos">
+      <div class="call-video-wrap call-video-local">
+        <video id="local-video" autoplay playsinline muted></video>
+        <span class="call-video-label">You</span>
+      </div>
+      <div class="call-video-wrap call-video-remote">
+        <video id="remote-video" autoplay playsinline></video>
+        <span class="call-video-label">@<%= other.username %></span>
+      </div>
+    </div>
+    <div class="call-actions">
+      <button type="button" id="hangup-btn" class="btn btn-danger call-btn">Hang up</button>
+    </div>
+  </div>
+</main>
+<script>
+(function() {
+  var OTHER_USER_ID = <%= other.id %>;
+  var OTHER_USERNAME = '<%= other.username.replace(/'/g, "\\'") %>';
+  var INCOMING = <%= incoming ? 'true' : 'false' %>;
+  var AUDIO_ONLY = <%= typeof audioOnly !== 'undefined' && audioOnly ? 'true' : 'false' %>;
+  var USER_ID = <%= userId %>;
+
+  var localVideo = document.getElementById('local-video');
+  var remoteVideo = document.getElementById('remote-video');
+  var callStatus = document.getElementById('call-status');
+  var hangupBtn = document.getElementById('hangup-btn');
+  var videosWrap = document.querySelector('.call-videos');
+
+  var ws = null;
+  var pc = null;
+  var localStream = null;
+  var callActive = false;
+
+  var wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  var wsUrl = wsProtocol + '//' + location.host + '/call/ws';
+
+  if (AUDIO_ONLY && videosWrap) videosWrap.style.display = 'none';
+
+  function setStatus(s) { if (callStatus) callStatus.textContent = s; }
+  function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
+
+  function hangup() {
+    callActive = false;
+    if (pc) { pc.close(); pc = null; }
+    if (localStream) { localStream.getTracks().forEach(function(t) { t.stop(); }); localStream = null; }
+    if (OTHER_USER_ID) send({ type: 'hangup', to: OTHER_USER_ID });
+    setStatus('Call ended.');
+    setTimeout(function() { window.close(); if (!window.closed) window.location.href = '/messages'; }, 1500);
+  }
+
+  function createPeerConnection() {
+    var config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    var p = new RTCPeerConnection(config);
+    if (localStream) localStream.getTracks().forEach(function(t) { p.addTrack(t, localStream); });
+    p.ontrack = function(ev) {
+      if (remoteVideo && ev.streams && ev.streams[0]) remoteVideo.srcObject = ev.streams[0];
+    };
+    p.onicecandidate = function(ev) {
+      if (ev.candidate) send({ type: 'ice-candidate', to: OTHER_USER_ID, candidate: ev.candidate });
+    };
+    p.onconnectionstatechange = function() {
+      if (p.connectionState === 'failed' || p.connectionState === 'disconnected') setStatus('Connection lost.');
+      if (p.connectionState === 'closed') hangup();
+    };
+    return p;
+  }
+
+  function doOffer() {
+    if (!pc || !callActive) return;
+    pc.createOffer().then(function(offer) {
+      return pc.setLocalDescription(offer);
+    }).then(function() {
+      send({ type: 'offer', to: OTHER_USER_ID, sdp: pc.localDescription });
+      setStatus('Waiting for answer...');
+    }).catch(function(err) { setStatus('Error: ' + (err.message || err)); });
+  }
+
+  function doAnswer() {
+    if (!pc || !callActive) return;
+    pc.createAnswer().then(function(answer) {
+      return pc.setLocalDescription(answer);
+    }).then(function() {
+      send({ type: 'answer', to: OTHER_USER_ID, sdp: pc.localDescription });
+      setStatus('In call with @' + OTHER_USERNAME);
+    }).catch(function(err) { setStatus('Error: ' + (err.message || err)); });
+  }
+
+  function connectWs() {
+    fetch('/api/call/token', { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        ws = new WebSocket(wsUrl + '?token=' + encodeURIComponent(data.token));
+        ws.onopen = function() {
+          if (INCOMING) {
+            setStatus('Connecting...');
+            send({ type: 'accept', from: OTHER_USER_ID });
+          } else {
+            setStatus('Calling @' + OTHER_USERNAME + '...');
+            send({ type: 'call', to: OTHER_USERNAME, video: !AUDIO_ONLY });
+          }
+        };
+        ws.onmessage = function(ev) {
+          var msg;
+          try { msg = JSON.parse(ev.data); } catch (_) { return; }
+          if (msg.type === 'offline') {
+            setStatus('User is offline.');
+            return;
+          }
+          if (msg.type === 'accepted') {
+            callActive = true;
+            pc = createPeerConnection();
+            setStatus('Connecting...');
+            doOffer();
+            return;
+          }
+          if (msg.type === 'declined') {
+            setStatus('Call declined.');
+            setTimeout(function() { window.close(); if (!window.closed) window.location.href = '/messages'; }, 2000);
+            return;
+          }
+          if (msg.type === 'offer') {
+            callActive = true;
+            pc = createPeerConnection();
+            pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).then(function() {
+              return doAnswer();
+            }).catch(function(err) { setStatus('Error: ' + (err.message || err)); });
+            return;
+          }
+          if (msg.type === 'answer') {
+            pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).then(function() {
+              setStatus('In call with @' + OTHER_USERNAME);
+            }).catch(function(err) { setStatus('Error: ' + (err.message || err)); });
+            return;
+          }
+          if (msg.type === 'ice-candidate' && msg.candidate && pc) {
+            pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(function() {});
+            return;
+          }
+          if (msg.type === 'hangup') {
+            setStatus('Other party left.');
+            hangup();
+          }
+        };
+        ws.onclose = function() { setStatus('Connection lost.'); };
+      })
+      .catch(function() { setStatus('Could not get call token.'); });
+  }
+
+  hangupBtn.addEventListener('click', hangup);
+  window.addEventListener('beforeunload', hangup);
+
+  var mediaOpts = AUDIO_ONLY ? { video: false, audio: true } : { video: true, audio: true };
+  navigator.mediaDevices.getUserMedia(mediaOpts)
+    .then(function(stream) {
+      localStream = stream;
+      if (localVideo) localVideo.srcObject = stream;
+      connectWs();
+    })
+    .catch(function(err) {
+      setStatus('Mic/camera access needed: ' + (err.message || err));
+      connectWs();
+    });
+})();
+</script>

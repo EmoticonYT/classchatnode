@@ -19,7 +19,7 @@ jobs:
 
       # Step 3: Unzip Folders.zip
       - name: Unzip Project Assets
-        run: unzip Folders.zip
+        run: unzip -o Folders.zip
 
       # Step 4: Install Dependencies
       - name: Install NPM Modules

@@ -1,0 +1,92 @@
+<div class="join-screen">
+  <!-- Main Suspension Card -->
+  <div id="main-card" class="auth-card banned-card" style="max-width: 440px; text-align: center; <%= (typeof showAppeal !== 'undefined' && showAppeal) ? 'display: none;' : '' %>">
+    <% if (typeof appealed !== 'undefined' && appealed) { %>
+    <div class="appeal-banner" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #10b981; padding: 12px 14px; border-radius: var(--radius-sm); font-size: 0.88rem; margin-bottom: 18px; text-align: left; line-height: 1.45;">
+      ✓ <strong>Appeal Submitted:</strong> Your suspension appeal has been received with high urgency. Staff will review it shortly.
+    </div>
+    <% } %>
+
+    <div class="logo">
+      <span class="logo-icon">🚫</span>
+      <h1>ClassChat</h1>
+      <p class="tagline highlight-version" style="color: #ef4444; font-weight: 600; margin-top: 4px;">Account Suspended</p>
+      <p class="muted" style="margin-top: 6px; font-size: 0.88rem;">Account: <strong>@<%= username %></strong></p>
+    </div>
+
+    <div class="banned-reason-box" style="background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin: 20px 0; text-align: left;">
+      <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #ef4444; margin-bottom: 4px;">Suspension Reason</div>
+      <div style="color: var(--text); font-size: 0.92rem; line-height: 1.45; word-break: break-word;"><%= ban_reason || 'This account has been permanently suspended by administration for violation of terms.' %></div>
+    </div>
+
+    <div style="margin-bottom: 24px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+      <div>Status: <strong style="color: #ef4444;">Permanent Account Ban</strong></div>
+      <% if (typeof banned_at !== 'undefined' && banned_at) { %>
+        <div>Issued on: <%= new Date(banned_at).toLocaleString() %></div>
+      <% } %>
+      <div style="margin-top: 6px;">If you believe this suspension was issued in error, you may submit an appeal below.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <button type="button" id="open-appeal-btn" class="btn btn-secondary btn-block" style="background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text);">Appeal Ban</button>
+      <a href="/logout" class="btn btn-ghost btn-block">Log Out</a>
+    </div>
+  </div>
+
+  <!-- Appeal Window (Matches Login Screen Design) -->
+  <div id="appeal-card" class="auth-card" style="max-width: 440px; <%= (typeof showAppeal !== 'undefined' && showAppeal) ? '' : 'display: none;' %>">
+    <div class="logo">
+      <span class="logo-icon">⚖️</span>
+      <h1>Appeal (Ban)</h1>
+      <p class="tagline">Submit an appeal for your account suspension</p>
+    </div>
+
+    <% if (typeof error !== 'undefined' && error === 'missing') { %>
+    <p class="form-error">Please fill in both the title and subject.</p>
+    <% } %>
+
+    <form action="/appeal" method="post" class="auth-form">
+      <input type="hidden" name="type" value="ban">
+
+      <div class="field" style="text-align: left;">
+        <label for="appeal_title">Title</label>
+        <input type="text" id="appeal_title" name="title" placeholder="Title" required autocomplete="off">
+      </div>
+
+      <div class="field" style="text-align: left;">
+        <label for="appeal_subject">Subject</label>
+        <textarea id="appeal_subject" name="subject" placeholder="Subject" rows="4" required></textarea>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button type="button" id="cancel-appeal-btn" class="btn btn-ghost" style="flex: 1;">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="flex: 1;">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  const mainCard = document.getElementById('main-card');
+  const appealCard = document.getElementById('appeal-card');
+  const openAppealBtn = document.getElementById('open-appeal-btn');
+  const cancelAppealBtn = document.getElementById('cancel-appeal-btn');
+
+  if (openAppealBtn && mainCard && appealCard) {
+    openAppealBtn.addEventListener('click', function() {
+      mainCard.style.display = 'none';
+      appealCard.style.display = 'block';
+      const titleInput = document.getElementById('appeal_title');
+      if (titleInput) titleInput.focus();
+    });
+  }
+
+  if (cancelAppealBtn && mainCard && appealCard) {
+    cancelAppealBtn.addEventListener('click', function() {
+      appealCard.style.display = 'none';
+      mainCard.style.display = 'block';
+    });
+  }
+})();
+</script>

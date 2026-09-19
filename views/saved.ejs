@@ -1,0 +1,80 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved" class="active">Saved</a>
+      <a href="/search">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="saved-page">
+  <div class="page-title-bubble">
+    <h1>Saved posts</h1>
+    <p class="muted">Posts you have bookmarked for later</p>
+  </div>
+  <% if (posts.length === 0) { %>
+  <div class="empty-card">
+    <p class="muted" style="margin:0;">No saved posts. Click 🔖 on any post to save it here.</p>
+  </div>
+  <% } else { %>
+  <div class="posts">
+    <% posts.forEach(function(post) { %>
+    <article class="post post-card" data-post-id="<%= post.id %>">
+      <div class="post-top-row">
+        <% if (post.author_avatar) { %>
+        <img src="<%= post.author_avatar %>" alt="" class="post-avatar post-avatar-img">
+        <% } else { %>
+        <div class="post-avatar"><%= (post.display_name || post.username || '?').charAt(0).toUpperCase() %></div>
+        <% } %>
+        <div class="post-body">
+          <div class="post-meta">
+            <span class="post-author">
+              <a href="/u/<%= post.username %>" class="post-author-link">
+                <strong class="post-display-name"><%= post.display_name || post.username %></strong>
+                <span class="post-handle muted">@<%= post.username %></span>
+              </a>
+              <% if (['emoticonyt', 'doriandelvalle'].includes((post.username || '').toLowerCase())) { %> <span class="owner-badge">Owner</span><% } %>
+            </span>
+            <% if (post.class_name) { %><span class="post-class-badge"><%= post.class_name %></span><% } %>
+            <span class="post-time"><%= post.created_at %></span>
+          </div>
+          <a href="/posts/<%= post.id %>" class="post-content-link">
+            <p class="post-text"><%= post.body %></p>
+            <% if (post.image_path) { %>
+            <div class="post-image-wrap">
+              <img src="<%= post.image_path %>" alt="Post image" class="post-image" loading="lazy">
+            </div>
+            <% } %>
+          </a>
+        </div>
+      </div>
+      <div class="post-controls">
+        <form action="/posts/<%= post.id %>/like" method="post" class="post-control-inline">
+          <button type="submit" class="post-control-btn <%= post.userLiked ? 'active' : '' %>">👍 <span><%= post.likeCount %></span></button>
+        </form>
+        <form action="/posts/<%= post.id %>/dislike" method="post" class="post-control-inline">
+          <button type="submit" class="post-control-btn <%= post.userDisliked ? 'active' : '' %>">👎 <span><%= post.dislikeCount %></span></button>
+        </form>
+        <a href="/posts/<%= post.id %>#reply-form" class="post-control-btn">💬 <span><%= post.replyCount %></span></a>
+        <form action="/posts/<%= post.id %>/save" method="post" class="post-control-inline">
+          <button type="submit" class="post-control-btn active" title="Unsave">🔖</button>
+        </form>
+      </div>
+    </article>
+    <% }); %>
+  </div>
+  <% } %>
+</main>

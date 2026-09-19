@@ -1,0 +1,61 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support">Support</a>
+      <a href="/staff/dashboard" class="active">Staff</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="staff-page" style="max-width: 600px; margin: 0 auto; padding: 24px;">
+  <p style="margin: 0 0 16px;"><a href="/staff/dashboard" class="btn btn-ghost btn-sm">← Back to Dashboard</a></p>
+
+  <div class="staff-section" style="padding: 24px;">
+    <h1 style="margin: 0 0 8px; font-size: 1.5rem;">Edit Post #<%= post.id %></h1>
+    <p class="muted" style="margin: 0 0 20px;">Moderate or update the content of this student post.</p>
+
+    <% if (typeof error !== 'undefined' && error === 'empty') { %>
+    <p style="color: #ef4444; font-size: 0.88rem; margin-bottom: 12px;">Body cannot be empty.</p>
+    <% } %>
+
+    <form action="/staff/posts/<%= post.id %>/edit" method="post" enctype="multipart/form-data">
+      <div class="form-group-custom">
+        <label>Author</label>
+        <input type="text" value="@<%= post.username %>" readonly style="opacity: 0.8; cursor: not-allowed;">
+      </div>
+      <div class="form-group-custom">
+        <label>Post Body</label>
+        <textarea name="body" rows="5" required><%= post.body %></textarea>
+      </div>
+      <div class="form-group-custom">
+        <label>Image Attachment (optional)</label>
+        <% if (post.image_path) { %>
+        <p class="muted" style="font-size: 0.82rem; margin-bottom: 8px;">Current attachment: <a href="<%= post.image_path %>" target="_blank"><%= post.image_path %></a></p>
+        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; margin-bottom: 10px;">
+          <input type="checkbox" name="remove_image" value="1" style="width: auto;"> Remove image from post
+        </label>
+        <% } %>
+        <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp">
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px;">
+        <a href="/staff/dashboard" class="btn btn-ghost">Cancel</a>
+        <button type="submit" class="btn btn-primary" style="padding: 10px 24px; font-weight: 600;">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</main>

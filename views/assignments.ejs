@@ -1,0 +1,47 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/assignments" class="active">Assignments</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="assignments-page" style="max-width: 700px; margin: 0 auto; padding: 24px;">
+  <h1>Assignments</h1>
+  <form method="get" action="/assignments" style="margin-bottom: 20px;">
+    <label>Class: <select name="class_id">
+      <option value="">— All —</option>
+      <% (classes || []).forEach(function(c) { %>
+      <option value="<%= c.id %>" <%= classId == c.id ? 'selected' : '' %>><%= c.name %></option>
+      <% }); %>
+    </select></label>
+    <button type="submit" class="btn btn-primary">View</button>
+  </form>
+  <% if (assignments.length === 0) { %>
+  <p class="muted">No assignments for this class.</p>
+  <% } else { %>
+  <ul class="assignments-list" style="list-style: none; padding: 0;">
+    <% assignments.forEach(function(a) { %>
+    <li style="padding: 16px; margin-bottom: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);">
+      <h3 style="margin: 0 0 8px;"><%= a.title %></h3>
+      <% if (a.description) { %><p class="muted"><%= a.description %></p><% } %>
+      <p class="muted">Due: <%= a.due_at %> · by <%= a.created_by_display_name ? a.created_by_display_name + ' (@' + a.created_by_username + ')' : '@' + a.created_by_username %></p>
+    </li>
+    <% }); %>
+  </ul>
+  <% } %>
+</main>

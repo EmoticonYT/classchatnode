@@ -1,0 +1,67 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends" class="active"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/search">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="friends-page">
+  <div class="page-title-bubble">
+    <h1>Friends</h1>
+    <p class="muted">Manage your connections and friend requests</p>
+  </div>
+  <% if (friends.length === 0) { %>
+  <div class="empty-card">
+    <p class="muted" style="margin:0;">No friends yet. Visit someone's profile and click "Add friend" to send a request.</p>
+  </div>
+  <% } else { %>
+  <ul class="friends-list">
+    <% friends.forEach(function(f) { %>
+    <li class="friend-item">
+      <a href="/u/<%= f.username %>" class="friend-link">
+        <% if (f.avatar_path) { %>
+        <img src="<%= f.avatar_path %>" alt="" class="friend-avatar">
+        <% } else { %>
+        <div class="friend-avatar friend-avatar-initial"><%= (f.display_name || f.username || '?').charAt(0).toUpperCase() %></div>
+        <% } %>
+        <div class="friend-info">
+          <span class="friend-name"><%= f.display_name || f.username %></span>
+          <span class="friend-username muted">@<%= f.username %></span>
+        </div>
+      </a>
+      <div class="friend-actions">
+        <a href="/messages/<%= f.username %>" class="btn btn-primary btn-sm">Message</a>
+        <div class="call-dropdown-wrap">
+          <details class="call-details">
+            <summary class="dropdown-trigger">Call ▾</summary>
+            <div class="dropdown-panel">
+              <a href="/call/<%= encodeURIComponent(f.username) %>">📹 Video call</a>
+              <a href="/call/<%= encodeURIComponent(f.username) %>?audio=1">🎧 Audio call</a>
+            </div>
+          </details>
+        </div>
+        <form action="/friends/remove" method="post" class="friend-action-form">
+          <input type="hidden" name="username" value="<%= f.username %>">
+          <button type="submit" class="btn btn-ghost btn-sm">Remove</button>
+        </form>
+      </div>
+    </li>
+    <% }); %>
+  </ul>
+  <% } %>
+</main>

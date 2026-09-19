@@ -1,0 +1,66 @@
+<div class="join-screen">
+  <div class="auth-card">
+    <a href="/" class="join-back">← Back</a>
+    <div class="logo">
+      <span class="logo-icon">💬</span>
+      <h1>ClassChat</h1>
+      <p class="tagline">Connect with your school community</p>
+    </div>
+    <div class="auth-tabs">
+      <a href="/join" class="auth-tab <%= !showLogin ? 'active' : '' %>">Sign up</a>
+      <a href="/join?login=1" class="auth-tab <%= showLogin ? 'active' : '' %>">Log in</a>
+    </div>
+
+    <% if (showLogin) { %>
+    <form action="/login" method="post" class="auth-form">
+      <% if (loginError === 'invalid') { %>
+      <p class="form-error">Invalid username or password.</p>
+      <% } %>
+      <div class="field">
+        <label for="login_username">Username</label>
+        <input type="text" id="login_username" name="username" placeholder="Your username" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="login_password">Password</label>
+        <input type="password" id="login_password" name="password" placeholder="Password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary">Log in</button>
+    </form>
+    <% } else { %>
+    <form action="/register" method="post" class="auth-form">
+      <% if (registerError === 'missing') { %><p class="form-error">Fill in all fields.</p><% } %>
+      <% if (registerError === 'username_short') { %><p class="form-error">Username must be at least 2 characters.</p><% } %>
+      <% if (registerError === 'username_invalid') { %><p class="form-error">Username must only contain lowercase letters, numbers, hyphens, and underscores.</p><% } %>
+      <% if (registerError === 'password_short') { %><p class="form-error">Password must be at least 6 characters.</p><% } %>
+      <% if (registerError === 'username_taken') { %><p class="form-error">That username is already taken.</p><% } %>
+      <input type="hidden" name="district" value="<%= district || '' %>">
+      <input type="hidden" name="school" value="<%= school || '' %>">
+      <div class="field">
+        <label for="reg_username">Username</label>
+        <input type="text" id="reg_username" name="username" placeholder="Choose a username" required autocomplete="username" minlength="2">
+      </div>
+      <div class="field">
+        <label for="reg_password">Password</label>
+        <input type="password" id="reg_password" name="password" placeholder="At least 6 characters" required autocomplete="new-password" minlength="6">
+      </div>
+      <% if (district) { %>
+      <div class="field">
+        <label for="district_display">District</label>
+        <input type="text" id="district_display" value="<%= district %>" readonly class="readonly">
+      </div>
+      <% } %>
+      <% if (school) { %>
+      <div class="field">
+        <label for="school_display">School</label>
+        <input type="text" id="school_display" value="<%= school %>" readonly class="readonly">
+      </div>
+      <% } %>
+      <div class="field">
+        <label for="reg_school_id">School ID number</label>
+        <input type="text" id="reg_school_id" name="school_id" placeholder="Your school ID" required autocomplete="off">
+      </div>
+      <button type="submit" class="btn btn-primary">Create account</button>
+    </form>
+    <% } %>
+  </div>
+</div>

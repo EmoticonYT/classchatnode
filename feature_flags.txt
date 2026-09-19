@@ -1,0 +1,4 @@
+# ClassChat Feature Flags
+# Set flag=1 to enable, flag=0 to disable
+
+chatroom_enabled=0

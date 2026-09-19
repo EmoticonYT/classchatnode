@@ -1,0 +1,262 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings" class="active">Settings</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="settings-page">
+  <div class="page-title-bubble">
+    <h1>Settings</h1>
+    <p class="muted">Manage your ClassChat preferences and appearance</p>
+  </div>
+  <section class="settings-section">
+    <h2>Appearance</h2>
+    <form action="/settings/theme" method="post">
+      <input type="hidden" name="redirect" value="/settings">
+      <label><input type="radio" name="theme" value="dark" <%= userSettings.theme === 'dark' ? 'checked' : '' %> /> Dark</label>
+      <label><input type="radio" name="theme" value="light" <%= userSettings.theme === 'light' ? 'checked' : '' %> /> Light</label>
+      <button type="submit" class="btn btn-primary">Save Mode</button>
+    </form>
+  </section>
+
+  <section class="settings-section custom-theme-section">
+    <h2>Custom Theme &amp; Accent Color</h2>
+    <p class="muted" style="margin: 0 0 16px; font-size: 0.9rem;">
+      Pick your custom accent color using the RGB sliders below. It dynamically tints buttons, badges, links, and gradients across the platform.
+    </p>
+
+    <!-- Color Preview & Current Values -->
+    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px; padding: 14px 18px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); flex-wrap: wrap;">
+      <div id="swatch-preview" style="width: 48px; height: 48px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 14px rgba(0,0,0,0.3); background-color: <%= userSettings.accent_color || '#6366f1' %>; transition: background-color 0.1s ease;"></div>
+      <div>
+        <div style="font-weight: 700; font-size: 1.1rem; letter-spacing: 0.05em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;" id="hex-display"><%= userSettings.accent_color || '#6366F1' %></div>
+        <div class="muted" style="font-size: 0.8rem;" id="rgb-display">rgb(<%= userSettings.accent_r %>, <%= userSettings.accent_g %>, <%= userSettings.accent_b %>)</div>
+      </div>
+      <div style="margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <span class="badge" style="background: var(--accent-soft); color: var(--accent); padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.78rem;">Live Preview</span>
+        <button type="button" class="btn btn-primary btn-sm" id="preview-sample-btn" style="pointer-events: none;">Accent Button</button>
+      </div>
+    </div>
+
+    <!-- Interactive Presets -->
+    <div style="margin-bottom: 20px;">
+      <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">Quick Color Presets</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;" id="preset-container">
+        <button type="button" class="preset-chip" data-r="99" data-g="102" data-b="241" data-hex="#6366f1" style="background: #6366f1; color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 16px; font-size: 0.82rem; cursor: pointer;">Classic Purple</button>
+        <button type="button" class="preset-chip" data-r="79" data-g="70" data-b="229" data-hex="#4f46e5" style="background: #4f46e5; color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 16px; font-size: 0.82rem; cursor: pointer;">Royal Indigo</button>
+        <button type="button" class="preset-chip" data-r="16" data-g="185" data-b="129" data-hex="#10b981" style="background: #10b981; color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 16px; font-size: 0.82rem; cursor: pointer;">Emerald</button>
+        <button type="button" class="preset-chip" data-r="14" data-g="165" data-b="233" data-hex="#0ea5e9" style="background: #0ea5e9; color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 16px; font-size: 0.82rem; cursor: pointer;">Electric Blue</button>
+        <button type="button" class="preset-chip" data-r="239" data-g="68" data-b="68" data-hex="#ef4444" style="background: #ef4444; color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 16px; font-size: 0.82rem; cursor: pointer;">Crimson Red</button>
+        <button type="button" class="preset-chip" data-r="245" data-g="158" data-b="11" data-hex="#f59e0b" style="background: #f59e0b; color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 16px; font-size: 0.82rem; cursor: pointer;">Amber Gold</button>
+        <button type="button" class="preset-chip" data-r="236" data-g="72" data-b="153" data-hex="#ec4899" style="background: #ec4899; color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 16px; font-size: 0.82rem; cursor: pointer;">Neon Pink</button>
+        <button type="button" class="preset-chip" data-r="6" data-g="182" data-b="212" data-hex="#06b6d4" style="background: #06b6d4; color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 16px; font-size: 0.82rem; cursor: pointer;">Cyber Cyan</button>
+      </div>
+    </div>
+
+    <!-- RGB Sliders Form -->
+    <form action="/settings/accent-color" method="post" id="accent-form">
+      <input type="hidden" name="hex" id="input-hex" value="<%= userSettings.accent_color || '#6366f1' %>">
+
+      <!-- Red Slider -->
+      <div style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <label for="slider-r" style="font-weight: 600; font-size: 0.88rem; color: #f87171;">🔴 Red</label>
+          <input type="number" id="num-r" min="0" max="255" value="<%= userSettings.accent_r %>" style="width: 65px; padding: 4px 8px; text-align: right; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text);">
+        </div>
+        <input type="range" id="slider-r" name="r" min="0" max="255" value="<%= userSettings.accent_r %>" style="width: 100%; accent-color: #ef4444; cursor: pointer;">
+      </div>
+
+      <!-- Green Slider -->
+      <div style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <label for="slider-g" style="font-weight: 600; font-size: 0.88rem; color: #4ade80;">🟢 Green</label>
+          <input type="number" id="num-g" min="0" max="255" value="<%= userSettings.accent_g %>" style="width: 65px; padding: 4px 8px; text-align: right; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text);">
+        </div>
+        <input type="range" id="slider-g" name="g" min="0" max="255" value="<%= userSettings.accent_g %>" style="width: 100%; accent-color: #22c55e; cursor: pointer;">
+      </div>
+
+      <!-- Blue Slider -->
+      <div style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <label for="slider-b" style="font-weight: 600; font-size: 0.88rem; color: #60a5fa;">🔵 Blue</label>
+          <input type="number" id="num-b" min="0" max="255" value="<%= userSettings.accent_b %>" style="width: 65px; padding: 4px 8px; text-align: right; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text);">
+        </div>
+        <input type="range" id="slider-b" name="b" min="0" max="255" value="<%= userSettings.accent_b %>" style="width: 100%; accent-color: #3b82f6; cursor: pointer;">
+      </div>
+
+      <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <button type="submit" class="btn btn-primary">Save Accent Theme</button>
+        <button type="button" id="reset-accent-btn" class="btn btn-ghost">Reset to Default</button>
+        <span id="save-status" style="font-size: 0.85rem; color: var(--success); display: none; font-weight: 600;">✓ Accent Saved!</span>
+      </div>
+    </form>
+  </section>
+  <section class="settings-section">
+    <h2>Email digest</h2>
+    <form action="/settings/email-digest" method="post">
+      <input type="hidden" name="redirect" value="/settings">
+      <label><input type="radio" name="email_digest" value="none" <%= userSettings.email_digest === 'none' ? 'checked' : '' %> /> None</label>
+      <label><input type="radio" name="email_digest" value="daily" <%= userSettings.email_digest === 'daily' ? 'checked' : '' %> /> Daily</label>
+      <label><input type="radio" name="email_digest" value="weekly" <%= userSettings.email_digest === 'weekly' ? 'checked' : '' %> /> Weekly</label>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+  </section>
+  <section class="settings-section">
+    <h2>About & Updates</h2>
+    <p class="muted" style="margin-bottom: 12px;">ClassChat 3.1 is here with customizable RGB themes, audit logs, and enhanced moderation.</p>
+    <a href="/whats-new" class="btn btn-ghost btn-sm">View What's New</a>
+  </section>
+  <p class="muted">Keyboard shortcuts: N = new post, / = search, Esc = close modal.</p>
+</main>
+
+<script>
+(function() {
+  const sliderR = document.getElementById('slider-r');
+  const sliderG = document.getElementById('slider-g');
+  const sliderB = document.getElementById('slider-b');
+  const numR = document.getElementById('num-r');
+  const numG = document.getElementById('num-g');
+  const numB = document.getElementById('num-b');
+  const swatch = document.getElementById('swatch-preview');
+  const hexDisplay = document.getElementById('hex-display');
+  const rgbDisplay = document.getElementById('rgb-display');
+  const inputHex = document.getElementById('input-hex');
+  const resetBtn = document.getElementById('reset-accent-btn');
+  const accentForm = document.getElementById('accent-form');
+  const saveStatus = document.getElementById('save-status');
+
+  let dynamicStyle = document.getElementById('dynamic-accent-override');
+  if (!dynamicStyle) {
+    dynamicStyle = document.createElement('style');
+    dynamicStyle.id = 'dynamic-accent-override';
+    document.head.appendChild(dynamicStyle);
+  }
+
+  function toHex(n) {
+    return Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
+  }
+
+  function updateColor(r, g, b, persistInput = true) {
+    r = parseInt(r, 10) || 0;
+    g = parseInt(g, 10) || 0;
+    b = parseInt(b, 10) || 0;
+
+    const hex = '#' + toHex(r) + toHex(g) + toHex(b);
+    const rgbStr = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+    const hoverStr = 'rgba(' + r + ', ' + g + ', ' + b + ', 0.85)';
+    const softStr = 'rgba(' + r + ', ' + g + ', ' + b + ', 0.16)';
+
+    if (persistInput) {
+      if (sliderR) sliderR.value = r;
+      if (sliderG) sliderG.value = g;
+      if (sliderB) sliderB.value = b;
+      if (numR) numR.value = r;
+      if (numG) numG.value = g;
+      if (numB) numB.value = b;
+    }
+
+    if (swatch) swatch.style.backgroundColor = hex;
+    if (hexDisplay) hexDisplay.textContent = hex.toUpperCase();
+    if (rgbDisplay) rgbDisplay.textContent = rgbStr;
+    if (inputHex) inputHex.value = hex;
+
+    // Dynamically override variables on document root
+    dynamicStyle.textContent = 
+      ':root, body, body.theme-light, body.theme-dark {' +
+      '  --accent: ' + hex + ' !important;' +
+      '  --accent-hover: ' + hoverStr + ' !important;' +
+      '  --accent-soft: ' + softStr + ' !important;' +
+      '}';
+  }
+
+  function onSliderChange() {
+    updateColor(sliderR.value, sliderG.value, sliderB.value, false);
+    if (numR) numR.value = sliderR.value;
+    if (numG) numG.value = sliderG.value;
+    if (numB) numB.value = sliderB.value;
+  }
+
+  function onNumChange() {
+    if (sliderR) sliderR.value = numR.value;
+    if (sliderG) sliderG.value = numG.value;
+    if (sliderB) sliderB.value = numB.value;
+    updateColor(numR.value, numG.value, numB.value, false);
+  }
+
+  [sliderR, sliderG, sliderB].forEach(el => el && el.addEventListener('input', onSliderChange));
+  [numR, numG, numB].forEach(el => el && el.addEventListener('input', onNumChange));
+
+  // Presets
+  document.querySelectorAll('.preset-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const r = btn.getAttribute('data-r');
+      const g = btn.getAttribute('data-g');
+      const b = btn.getAttribute('data-b');
+      updateColor(r, g, b, true);
+    });
+  });
+
+  // Reset button
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      updateColor(99, 102, 241, true);
+      try {
+        await fetch('/settings/accent-color/reset', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (saveStatus) {
+          saveStatus.textContent = '✓ Reset to Default Theme!';
+          saveStatus.style.display = 'inline-block';
+          setTimeout(() => { saveStatus.style.display = 'none'; }, 2500);
+        }
+      } catch (_) {}
+    });
+  }
+
+  // AJAX submit for seamless saving without reload
+  if (accentForm) {
+    accentForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const r = sliderR ? sliderR.value : 99;
+      const g = sliderG ? sliderG.value : 102;
+      const b = sliderB ? sliderB.value : 241;
+      const hex = inputHex ? inputHex.value : '#6366f1';
+
+      try {
+        const res = await fetch('/settings/accent-color', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json'
+          },
+          body: new URLSearchParams({ r, g, b, hex }).toString()
+        });
+        if (res.ok) {
+          if (saveStatus) {
+            saveStatus.textContent = '✓ Accent Saved!';
+            saveStatus.style.display = 'inline-block';
+            setTimeout(() => { saveStatus.style.display = 'none'; }, 2500);
+          }
+        }
+      } catch (err) {
+        accentForm.submit();
+      }
+    });
+  }
+})();
+</script>

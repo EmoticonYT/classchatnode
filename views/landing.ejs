@@ -1,0 +1,15 @@
+<div class="landing-page">
+  <div class="landing-hero">
+    <span class="landing-logo-icon">💬</span>
+    <h1 class="landing-title">ClassChat</h1>
+    <p class="landing-tagline">Connect with your school community</p>
+    <% if (school) { %><p class="landing-school"><%= school %></p><% } %>
+    <% if (district) { %><p class="landing-muted"><%= district %></p><% } %>
+  </div>
+  <div class="landing-cta">
+    <a href="/join" class="landing-btn landing-btn-primary">Get started</a>
+    <a href="/join?login=1" class="landing-btn landing-btn-ghost">Log in</a>
+    <a href="/guest" class="landing-btn landing-btn-ghost">Browse as guest</a>
+  </div>
+  <p class="landing-footer-muted">Join with your school ID to post, message friends, and stay in the loop. Or browse as guest to view posts only.</p>
+</div>

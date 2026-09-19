@@ -1,0 +1,59 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand">
+      <span class="logo-icon">💬</span>
+      <span>ClassChat</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity" class="active">Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/search">Search</a>
+      <% if (typeof is_staff !== 'undefined' && is_staff) { %><a href="/staff/dashboard">Staff</a><% } %>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+<main class="activity-page">
+  <div class="page-title-bubble">
+    <h1>Activity</h1>
+    <p class="muted">Likes, replies, and friend requests. Marked as read when you open this page.</p>
+  </div>
+  <% if (notifications.length === 0) { %>
+  <div class="empty-card">
+    <p class="muted" style="margin:0;">No activity yet.</p>
+  </div>
+  <% } else { %>
+  <ul class="activity-list">
+    <% notifications.forEach(function(n) { %>
+    <li class="activity-item <%= n.read_at ? '' : 'activity-unread' %>">
+      <% if (n.actor_avatar) { %>
+      <img src="<%= n.actor_avatar %>" alt="" class="activity-avatar">
+      <% } else { %>
+      <div class="activity-avatar activity-avatar-initial"><%= (n.actor_display_name || n.actor_username || '?').charAt(0).toUpperCase() %></div>
+      <% } %>
+      <div class="activity-content">
+        <% if (n.type === 'post_like') { %>
+        <p><a href="/u/<%= n.actor_username %>" class="activity-actor"><%= n.actor_display_name || n.actor_username %></a> liked your <a href="/posts/<%= n.post_id %>">post</a>.</p>
+        <% } else if (n.type === 'post_reply') { %>
+        <p><a href="/u/<%= n.actor_username %>" class="activity-actor"><%= n.actor_display_name || n.actor_username %></a> replied to your <a href="/posts/<%= n.post_id %>">post</a>.</p>
+        <% } else if (n.type === 'friend_request') { %>
+        <p><a href="/u/<%= n.actor_username %>" class="activity-actor"><%= n.actor_display_name || n.actor_username %></a> sent you a friend request. <a href="/u/<%= n.actor_username %>">View profile</a></p>
+        <% } else if (n.type === 'friend_accepted') { %>
+        <p><a href="/u/<%= n.actor_username %>" class="activity-actor"><%= n.actor_display_name || n.actor_username %></a> accepted your friend request.</p>
+        <% } else { %>
+        <p><%= n.type %></p>
+        <% } %>
+        <span class="activity-time muted"><%= n.created_at %></span>
+      </div>
+    </li>
+    <% }); %>
+  </ul>
+  <% } %>
+</main>

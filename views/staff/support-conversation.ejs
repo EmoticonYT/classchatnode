@@ -1,0 +1,65 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a href="/feed" class="brand"><span class="logo-icon">💬</span><span>ClassChat</span></a>
+    <nav class="nav-links">
+      <a href="/feed">Feed</a>
+      <a href="/u/<%= username %>">Profile</a>
+      <a href="/messages">Messages</a>
+      <a href="/friends"><% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount) { %><span class="nav-badge"><%= pendingFriendRequestsCount %></span> <% } %>Friends</a>
+      <a href="/activity"><% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount) { %><span class="nav-badge"><%= unreadActivityCount %></span> <% } %>Activity</a>
+      <a href="/saved">Saved</a>
+      <a href="/stories">Stories</a>
+      <a href="/call-history">Calls</a>
+      <a href="/search">Search</a>
+      <a href="/settings">Settings</a>
+      <a href="/support">Support</a>
+      <a href="/staff/dashboard" class="active">Staff</a>
+    </nav>
+    <div class="header-right">
+      <span class="user-badge">@<%= username %><% if (typeof district !== 'undefined' && district) { %> · <%= district %><% } %></span>
+      <a href="/logout" class="btn btn-ghost">Log out</a>
+    </div>
+  </div>
+</header>
+
+<main class="staff-page" style="max-width: 700px; margin: 0 auto; padding: 24px;">
+  <p style="margin: 0 0 16px;"><a href="/staff/dashboard" class="btn btn-ghost btn-sm">← Back to Dashboard</a></p>
+
+  <div class="staff-section" style="padding: 24px;">
+    <h1 style="margin: 0 0 6px; font-size: 1.4rem;">Support DM: @<%= other.username %></h1>
+    <p class="muted" style="margin: 0 0 20px;">Direct messaging thread with @CCSupport.</p>
+
+    <div class="ticket-thread">
+      <% messages.forEach(function(m) { %>
+      <div class="ticket-message <%= m.sender_id === supportUser.id ? 'from-staff' : '' %>">
+        <div class="message-author-bar">
+          <div class="message-author-info">
+            <% if (m.sender_avatar) { %>
+            <img src="<%= m.sender_avatar %>" alt="" class="staff-avatar">
+            <% } else { %>
+            <span class="staff-avatar staff-avatar-initial"><%= (m.sender_username || '?').charAt(0).toUpperCase() %></span>
+            <% } %>
+            <span class="message-author-name"><%= m.sender_id === supportUser.id ? '@CCSupport (Staff)' : '@' + m.sender_username %></span>
+          </div>
+          <span class="muted" style="font-size: 0.8rem;"><%= m.created_at %></span>
+        </div>
+        <div class="message-body"><%= m.body %></div>
+      </div>
+      <% }); %>
+      <% if (messages.length === 0) { %>
+      <p class="muted" style="text-align: center; padding: 20px;">No messages in this thread yet.</p>
+      <% } %>
+    </div>
+
+    <form action="/staff/support/<%= encodeURIComponent(other.username) %>" method="post" style="margin-top: 20px;">
+      <% if (typeof error !== 'undefined' && error === 'empty') { %>
+      <p style="color: #ef4444; font-size: 0.88rem; margin-bottom: 12px;">Message cannot be empty.</p>
+      <% } %>
+      <div class="form-group-custom">
+        <label>Reply as @CCSupport</label>
+        <textarea name="body" class="reply-textarea" rows="3" maxlength="2000" placeholder="Type your reply..." required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary" style="padding: 10px 24px;">Send reply</button>
+    </form>
+  </div>
+</main>
