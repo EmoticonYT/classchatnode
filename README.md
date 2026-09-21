@@ -1,41 +1,39 @@
-# 💬 ClassChat 4.0 Plus
+# 💬 ClassChat Framework 4.0 Plus
 
-ClassChat is a modern, student-centric social communication and collaboration platform built for schools, study groups, clubs, and student communities.
+**ClassChat** is an open-source, extensible communication and community framework built for schools, student organizations, and educational networks. Designed for high performance, easy customization, and self-hosted deployments, the ClassChat Framework provides a turnkey foundation for real-time messaging, Discord-style community servers, WebRTC calling, and comprehensive school-level moderation.
 
 ---
 
-## ✨ Features
+## 🏗️ Architecture & Framework Modules
 
-### 🏰 ClassChat Plus — Student Community Servers
-* **Custom Community Servers:** Create servers for study groups, clubs, sports teams, or friends with custom server icons and cover banners.
-* **Topic Channels:** Organize discussions into dedicated channels like `#general`, `#homework-help`, and `#announcements`.
-* **Live Real-Time Chat:** WebSocket-powered instant messaging with typing indicators, live updates, and zero refreshing needed.
-* **Emoji Reactions:** React to any message with emojis in real time with interactive live counters.
-* **Pinned Messages:** Pin important notes, links, and assignment deadlines to the top of any channel with instant jump-to-message navigation.
-* **In-Channel Search:** Search message history in any channel with live query highlighting.
-* **Member Mini-Profile Cards:** Click any student's avatar to view roles (Owner, Admin, Member), online presence, and jump straight into direct messaging.
-* **One-Click Server Invites:** Beautiful Discord-style invite pages (`/plus/invite/:code`) featuring server banners, member counts, and instant joining.
-* **Server Discovery Hub:** Explore and join public school servers from the Discover directory.
+### 🏰 1. ClassChat Plus Community Engine
+* **Self-Hosted Community Servers:** Full server creation framework supporting custom icons, cover banners, and privacy controls (discoverable public communities or invite-only).
+* **Topic Channel Router:** Hierarchical channel routing system (`#general`, `#homework-help`, `#announcements`, etc.) per server.
+* **WebSocket Real-Time Messaging Core:** Low-latency event-driven engine powering instant message delivery, live typing bubbles, and dynamic emoji reactions.
+* **Content Persistence & Organization:** In-channel keyword search engine, pinned message drawer with jump-to-target scrolling, and in-place message editing.
+* **Role & Member Mini-Profiles:** Extensible permissions framework (Server Owner, Admin, Member) and member mini-card modals with presence detection and direct communication shortcuts.
+* **Universal Invitation System:** Dynamic Discord-style invite landing pages (`/plus/invite/:code`) with metadata preview cards and one-click onboarding.
 
-### 📱 Core Social & School Tools
-* **School Feed:** Post updates, ask homework questions, and filter posts by class subjects (Math, Science, English, History, etc.).
-* **Private Direct Messaging:** 1-on-1 real-time direct chats with typing indicators and read receipts.
-* **WebRTC Voice & Video Calling:** Call friends directly in-browser with crystal-clear audio and video.
-* **Live School Chatrooms:** Open discussion rooms for students across the school.
-* **RGB Accent Customizer:** Customize your personal UI accent color with interactive RGB sliders and presets in Settings.
-* **Profiles & Custom Avatars:** Personalize your avatar, header banner, student bio, and class schedule.
+### 📱 2. Social & School Collaboration Suite
+* **Subject-Segmented Feed:** Class filtering pipeline (Math, Science, English, History, Electives) with rich media and image attachment support.
+* **1-on-1 Direct Messaging:** Private messaging module featuring real-time typing indicators, unread activity badges, and read receipts.
+* **WebRTC Voice & Video:** Peer-to-peer audio and video calling subsystem integrated directly in-browser.
+* **Campus Chatrooms:** Lightweight real-time discussion rooms for broader school interactions.
+* **RGB Theming Engine:** Dynamic CSS custom properties generator allowing users to configure platform accent colors via interactive RGB sliders or preset palettes.
+* **Identity & Profiles:** Custom avatars, bio markdown, and class schedule displays.
 
-### 🛡️ Safety & Moderation
-* **Staff Dashboard & Audit Log:** Immutable staff audit log tracking administrative moderation actions.
-* **User Controls:** Moderation tools for timeouts, appeals with live countdowns, and account management.
-* **Support Ticket Desk:** Built-in student help center and priority support ticketing system.
+### 🛡️ 3. Safety, Moderation & Administration Framework
+* **Moderator Audit Log:** Tamper-evident administrative audit logging tracking staff interventions (timeouts, bans, user edits, server moderation).
+* **Sanctions & Automated Appeals:** User timeout mechanisms paired with live countdowns and integrated appeal ticket workflows.
+* **Help Desk & Ticketing:** Multi-tier support ticketing system with priority escalation.
+* **Feature Flagging System:** Decoupled runtime toggles (`feature_flags.txt`) enabling seamless activation/deactivation of modules (Plus, chatrooms, etc.) without downtime.
 
 ---
 
 ## 🚀 Getting Started
 
 > [!NOTE]
-> Ensure you have **Node.js (v18+)** and **Git** installed on your system.
+> Ensure you have **Node.js (v18+)** and **Git** installed on your host system.
 
 ### Installation
 
@@ -50,10 +48,29 @@ ClassChat is a modern, student-centric social communication and collaboration pl
    npm install
    ```
 
-3. **Start the server:**
+3. **Configure Environment & Flags:**
+   Adjust runtime capabilities in `feature_flags.txt` and set custom ports or secrets via environment variables:
+   ```bash
+   export PORT=5000
+   export SESSION_SECRET="your-secure-session-secret"
+   ```
+
+4. **Launch the Framework:**
    ```bash
    node server.js
    ```
+   Or manage with a process manager like `pm2`:
+   ```bash
+   pm2 start server.js --name classchat
+   ```
 
-4. **Access ClassChat:**
-   Open your browser to `http://localhost:5000` (or `http://localhost:3000` depending on your environment).
+5. **Access the Instance:**
+   Navigate to `http://localhost:5000` (or your configured port).
+
+---
+
+## 🛠️ Customization & Extending the Framework
+
+* **Templates & Views:** Modular EJS templates in [`views/`](views/) structured into `views/plus/`, `views/staff/`, and `views/support/`.
+* **Styling System:** Modern CSS design tokens located in [`public/css/style.css`](public/css/style.css) and [`public/css/plus.css`](public/css/plus.css).
+* **Database Layer:** Atomic SQLite operations powered by `better-sqlite3` in [`db.js`](db.js), supporting automatic schema initialization and migrations.
