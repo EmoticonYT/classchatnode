@@ -7,7 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css?v=3.1.0">
+  <link rel="stylesheet" href="/css/style.css?v=4.0.0">
+  <link rel="stylesheet" href="/css/plus.css">
   <% if (typeof userSettings !== 'undefined' && userSettings && userSettings.accent_color) { %>
   <style id="custom-accent-style">
     :root, body, body.theme-light, body.theme-dark {
@@ -24,15 +25,27 @@
   <% if (hasSidebar) { %>
   <!-- Mobile Header Bar -->
   <header class="mobile-top-bar">
-    <button type="button" class="mobile-menu-btn" id="mobile-sidebar-toggle" aria-label="Toggle navigation">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-    </button>
-    <a href="/feed" class="mobile-brand">
-      <span class="logo-icon">💬</span>
-      <span class="brand-text">ClassChat</span>
-    </a>
+    <div class="mobile-left">
+      <button type="button" class="mobile-menu-btn" id="mobile-sidebar-toggle" aria-label="Toggle navigation">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+      </button>
+      <a href="/feed" class="mobile-brand">
+        <span class="logo-icon">💬</span>
+        <span class="brand-text">ClassChat</span>
+        <span class="mobile-brand-pill">4.0 Plus</span>
+      </a>
+    </div>
     <div class="mobile-right">
+      <a href="/search" class="mobile-icon-btn" aria-label="Search">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </a>
       <% if (typeof username !== 'undefined' && username) { %>
+        <a href="/activity" class="mobile-icon-btn" aria-label="Activity" style="position:relative;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <% if (typeof unreadActivityCount !== 'undefined' && unreadActivityCount > 0) { %>
+            <span class="mobile-badge-dot"></span>
+          <% } %>
+        </a>
         <a href="/u/<%= username %>" class="mobile-avatar-link">
           <% if (typeof currentUser !== 'undefined' && currentUser && currentUser.avatar_path) { %>
             <img src="<%= currentUser.avatar_path %>" alt="" class="nav-user-avatar">
@@ -91,6 +104,15 @@
           <a href="/chatrooms" class="sidebar-link <%= p.startsWith('/chatrooms') ? 'active' : '' %>">
             <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
             <span class="sidebar-label">Chatrooms</span>
+          </a>
+        </li>
+        <% } %>
+
+        <% if (typeof featureFlags !== 'undefined' && featureFlags.plus_enabled) { %>
+        <li class="sidebar-item">
+          <a href="/plus" class="sidebar-link sidebar-plus-btn <%= p.startsWith('/plus') ? 'active' : '' %>" title="ClassChat Plus">
+            <svg class="sidebar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span class="sidebar-label">Plus</span>
           </a>
         </li>
         <% } %>
@@ -199,12 +221,53 @@
     <% if (!hasSidebar && typeof showSupportButton !== 'undefined' && showSupportButton) { %>
     <footer class="app-footer">
       <div class="app-footer-inner">
-        <p class="app-footer-fine">ClassChat 3.1 · Need help? <a href="/support">Help &amp; Support</a></p>
+        <p class="app-footer-fine">ClassChat 4.0 Plus · Need help? <a href="/support">Help &amp; Support</a></p>
       </div>
     </footer>
     <% } %>
-    </div>
   </div>
+
+  <% if (hasSidebar && typeof username !== 'undefined' && username) { %>
+  <!-- Mobile App Bottom Navigation Dock -->
+  <% const p = typeof currentPath !== 'undefined' ? currentPath : ''; %>
+  <nav class="mobile-bottom-nav" aria-label="Mobile Navigation">
+    <a href="/feed" class="mobile-nav-item <%= p === '/feed' || p === '/' ? 'active' : '' %>">
+      <span class="mobile-nav-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+      </span>
+      <span class="mobile-nav-label">Feed</span>
+    </a>
+    <a href="/messages" class="mobile-nav-item <%= p.startsWith('/messages') || p.startsWith('/conversations') ? 'active' : '' %>">
+      <span class="mobile-nav-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      </span>
+      <span class="mobile-nav-label">Messages</span>
+    </a>
+    <% if (typeof featureFlags !== 'undefined' && featureFlags.plus_enabled) { %>
+    <a href="/plus" class="mobile-nav-item mobile-nav-plus <%= p.startsWith('/plus') ? 'active' : '' %>">
+      <span class="mobile-nav-icon mobile-plus-icon-wrap">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      </span>
+      <span class="mobile-nav-label">Plus</span>
+    </a>
+    <% } %>
+    <a href="/friends" class="mobile-nav-item <%= p === '/friends' ? 'active' : '' %>">
+      <span class="mobile-nav-icon" style="position:relative;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <% if (typeof pendingFriendRequestsCount !== 'undefined' && pendingFriendRequestsCount > 0) { %>
+          <span class="mobile-nav-badge"><%= pendingFriendRequestsCount %></span>
+        <% } %>
+      </span>
+      <span class="mobile-nav-label">Friends</span>
+    </a>
+    <a href="/u/<%= username %>" class="mobile-nav-item <%= p.startsWith('/u/') && p.includes(username) ? 'active' : '' %>">
+      <span class="mobile-nav-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      </span>
+      <span class="mobile-nav-label">Profile</span>
+    </a>
+  </nav>
+  <% } %>
   <div id="incoming-call-modal" class="incoming-call-modal" style="display:none;">
     <div class="incoming-call-box">
       <p id="incoming-call-title" class="incoming-call-title">Incoming video call</p>
@@ -239,6 +302,56 @@
         sidebarBackdrop.classList.remove('show');
       });
     }
+    window.addEventListener('resize', function() {
+      if (window.innerWidth > 850 && floatingSidebar) {
+        floatingSidebar.classList.remove('open');
+        if (sidebarBackdrop) sidebarBackdrop.classList.remove('show');
+      }
+    });
+  </script>
+
+
+
+  <script>
+  function enableClassChatPlus() {
+    var btn = document.getElementById('enable-plus-confirm-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Enabling...'; }
+    fetch('/plus/enable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      window.location.href = (data && data.redirect) ? data.redirect : '/plus';
+    })
+    .catch(function() {
+      window.location.href = '/plus';
+    });
+  }
+
+  // Keyboard secret trigger for ClassChat Plus: typing "plus" (any case) on home screen (/ or /feed)
+  (function() {
+    var keyBuffer = '';
+    var bufferTimeout = null;
+    document.addEventListener('keydown', function(e) {
+      var p = window.location.pathname;
+      if (p !== '/' && p !== '/feed') return;
+      var tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (document.activeElement && document.activeElement.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key && e.key.length === 1 && /^[a-zA-Z]$/.test(e.key)) {
+        keyBuffer += e.key.toLowerCase();
+        if (keyBuffer.length > 10) keyBuffer = keyBuffer.slice(-10);
+        clearTimeout(bufferTimeout);
+        bufferTimeout = setTimeout(function() { keyBuffer = ''; }, 3000);
+        if (keyBuffer.endsWith('plus')) {
+          keyBuffer = '';
+          var m = document.getElementById('classchat-plus-modal');
+          if (m) m.style.display = 'flex';
+        }
+      }
+    });
+  })();
   </script>
 </body>
 </html>

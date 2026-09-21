@@ -24,22 +24,24 @@ const pushSubscriptionsByUser = new Map(); // userId -> array of { subscription 
 const CALL_TOKEN_TTL_MS = 60 * 1000;
 
 function addSocketUser(userId, ws) {
-  if (!socketsByUser.has(userId)) {
-    socketsByUser.set(userId, new Set());
+  const uid = Number(userId);
+  if (!socketsByUser.has(uid)) {
+    socketsByUser.set(uid, new Set());
   }
-  socketsByUser.get(userId).add(ws);
+  socketsByUser.get(uid).add(ws);
 }
 
 function removeSocketUser(userId, ws) {
-  const set = socketsByUser.get(userId);
+  const uid = Number(userId);
+  const set = socketsByUser.get(uid);
   if (set) {
     set.delete(ws);
-    if (set.size === 0) socketsByUser.delete(userId);
+    if (set.size === 0) socketsByUser.delete(uid);
   }
 }
 
 function isUserOnline(userId) {
-  const set = socketsByUser.get(userId);
+  const set = socketsByUser.get(Number(userId));
   if (!set || set.size === 0) return false;
   for (const s of set) {
     if (s.readyState === 1) return true;
@@ -48,7 +50,7 @@ function isUserOnline(userId) {
 }
 
 function sendToUser(userId, eventObj) {
-  const set = socketsByUser.get(userId);
+  const set = socketsByUser.get(Number(userId));
   if (!set || set.size === 0) return false;
   const payload = typeof eventObj === 'string' ? eventObj : JSON.stringify(eventObj);
   let sent = false;
@@ -97,6 +99,13 @@ function broadcastToRoom(roomId, eventObj) {
     for (const m of members) {
       sendToUser(m.user_id, eventObj);
     }
+  }
+}
+
+function broadcastToPlusServer(serverId, eventObj) {
+  const members = db.getPlusServerMembers(serverId);
+  for (const m of members) {
+    sendToUser(m.id, eventObj);
   }
 }
 
@@ -208,6 +217,25 @@ const avatarUpload = multer({
   },
 });
 
+const plusStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const ext = (file.mimetype.match(/\/(jpeg|jpg|png|gif|webp)$/i) && file.originalname.split('.').pop()) || 'png';
+    cb(null, `plus-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext.replace(/[^a-z0-9]/gi, '')}`);
+  },
+});
+const plusServerUpload = multer({
+  storage: plusStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /^image\/(jpeg|jpg|png|gif|webp)$/i.test(file.mimetype);
+    cb(null, ok);
+  },
+}).fields([
+  { name: 'icon', maxCount: 1 },
+  { name: 'banner', maxCount: 1 },
+]);
+
 db.initDb();
 
 app.set('view engine', 'ejs');
@@ -259,6 +287,7 @@ function getFeatureFlags() {
   const flagsPath = path.join(__dirname, 'feature_flags.txt');
   const flags = {
     chatroom_enabled: false,
+    plus_enabled: false,
   };
   if (fs.existsSync(flagsPath)) {
     try {
@@ -275,6 +304,14 @@ function getFeatureFlags() {
   }
   return flags;
 }
+
+app.use('/plus', (req, res, next) => {
+  const flags = getFeatureFlags();
+  if (!flags.plus_enabled) {
+    return res.redirect('/feed');
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   res.locals.featureFlags = getFeatureFlags();
@@ -375,19 +412,22 @@ function sanitizeUsername(username) {
 
 function requireAuth(req, res, next) {
   if (req.session.userId) {
-    if (req.session.username !== 'wn-test' && !db.hasSeenWhatsNew(req.session.userId, '3.1')) {
+    if (!req.path.startsWith('/api/') && req.session.username !== 'wn-test' && !db.hasSeenWhatsNew(req.session.userId, '4.0')) {
       if (!req.path.startsWith('/whats-new') && req.path !== '/logout') {
         return res.redirect('/whats-new');
       }
     }
     return next();
   }
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
   res.redirect('/join?login=1');
 }
 
 function allowGuestOrAuth(req, res, next) {
   if (req.session.userId) {
-    if (req.session.username !== 'wn-test' && !db.hasSeenWhatsNew(req.session.userId, '3.1')) {
+    if (req.session.username !== 'wn-test' && !db.hasSeenWhatsNew(req.session.userId, '4.0')) {
       if (!req.path.startsWith('/whats-new') && req.path !== '/logout') {
         return res.redirect('/whats-new');
       }
@@ -470,7 +510,7 @@ app.post('/staff/login', (req, res) => {
 
 app.get('/', (req, res) => {
   if (req.session.userId) {
-    if (req.session.username !== 'wn-test' && !db.hasSeenWhatsNew(req.session.userId, '3.1')) {
+    if (req.session.username !== 'wn-test' && !db.hasSeenWhatsNew(req.session.userId, '4.0')) {
       return res.redirect('/whats-new');
     }
     return res.redirect('/feed');
@@ -549,7 +589,7 @@ app.post('/login', (req, res) => {
   if (user.username === 'wn-test') {
     return res.redirect('/whats-new');
   }
-  if (!db.hasSeenWhatsNew(user.id, '3.1')) {
+  if (!db.hasSeenWhatsNew(user.id, '4.0')) {
     return res.redirect('/whats-new');
   }
   res.redirect('/feed');
@@ -637,7 +677,7 @@ app.post('/appeal', (req, res) => {
 
 app.get('/whats-new', requireAuth, (req, res) => {
   res.render('whats-new', {
-    title: "What's New — ClassChat 3.1",
+    title: "What's New — ClassChat 4.0 Plus",
     layout: 'layout',
     hideSidebar: true,
     username: req.session.username,
@@ -646,7 +686,7 @@ app.get('/whats-new', requireAuth, (req, res) => {
 
 app.all('/whats-new/dismiss', requireAuth, (req, res) => {
   if (req.session.username !== 'wn-test') {
-    db.markSeenWhatsNew(req.session.userId, '3.1');
+    db.markSeenWhatsNew(req.session.userId, '4.0');
   }
   res.redirect('/feed');
 });
@@ -1493,6 +1533,674 @@ app.post('/staff/chatrooms/:id/delete', requireStaff, (req, res) => {
   res.redirect('/messages');
 });
 
+// --- ClassChat Plus (Discord-like Servers & Channels) ---
+
+app.post('/plus/enable', requireAuth, (req, res) => {
+  db.setPlusEnabled(req.session.userId, 1);
+  if (req.xhr || req.headers.accept?.includes('json')) {
+    return res.json({ success: true, redirect: '/plus' });
+  }
+  res.redirect('/plus');
+});
+
+
+app.get(['/plus', '/plus/discover'], requireAuth, (req, res) => {
+  // Ensure plus_enabled is turned on for users who visit /plus
+  db.setPlusEnabled(req.session.userId, 1);
+
+  const query = (req.query.q || '').trim().toLowerCase();
+  let discoverServers = db.getDiscoverablePlusServers(req.session.userId);
+  if (query) {
+    discoverServers = discoverServers.filter(s =>
+      s.name.toLowerCase().includes(query) || (s.description && s.description.toLowerCase().includes(query))
+    );
+  }
+  const userServers = db.getUserPlusServers(req.session.userId);
+
+  res.render('plus/discover', {
+    title: 'Discover Servers — ClassChat Plus',
+    currentPath: '/plus',
+    userServers,
+    discoverServers,
+    searchQuery: query,
+    createError: req.query.error || null,
+  });
+});
+
+app.get('/plus/create', requireAuth, (req, res) => {
+  const userServers = db.getUserPlusServers(req.session.userId);
+  res.render('plus/create', {
+    title: 'Create a Server — ClassChat Plus',
+    currentPath: '/plus',
+    userServers,
+    error: req.query.error || null,
+  });
+});
+
+app.post('/plus/create', requireAuth, (req, res) => {
+  plusServerUpload(req, res, (err) => {
+    if (err) {
+      return res.redirect(`/plus/create?error=${encodeURIComponent(err.message || 'File upload error')}`);
+    }
+
+    const name = (req.body.name || '').trim();
+    if (!name || name.length < 2) {
+      return res.redirect('/plus/create?error=Server+name+must+be+at+least+2+characters');
+    }
+    if (name.length > 50) {
+      return res.redirect('/plus/create?error=Server+name+cannot+exceed+50+characters');
+    }
+
+    // Combined image and banner must not exceed 5MB
+    const iconFile = req.files?.icon?.[0];
+    const bannerFile = req.files?.banner?.[0];
+    const totalSize = (iconFile?.size || 0) + (bannerFile?.size || 0);
+    const MAX_COMBINED = 5 * 1024 * 1024; // 5MB
+
+    if (totalSize > MAX_COMBINED) {
+      if (iconFile?.path) fs.unlink(iconFile.path, () => {});
+      if (bannerFile?.path) fs.unlink(bannerFile.path, () => {});
+      return res.redirect('/plus/create?error=Combined+image+and+banner+size+must+not+exceed+5MB');
+    }
+
+    const description = (req.body.description || '').trim();
+    const isDiscoverable = (req.body.is_discoverable === '1' || req.body.is_discoverable === 'on' || req.body.privacy === 'public') ? 1 : 0;
+    const iconPath = iconFile ? `/uploads/${path.basename(iconFile.path)}` : null;
+    const bannerPath = bannerFile ? `/uploads/${path.basename(bannerFile.path)}` : null;
+
+    const result = db.createPlusServer(
+      req.session.userId,
+      name,
+      description,
+      iconPath,
+      bannerPath,
+      isDiscoverable
+    );
+
+    db.setPlusEnabled(req.session.userId, 1);
+    res.redirect(`/plus/server/${result.serverId}/channel/${result.defaultChannelId}`);
+  });
+});
+
+app.get('/plus/server/:serverId', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  if (db.isPlusServerBanned(serverId, req.session.userId)) {
+    return res.redirect('/plus?error=You+have+been+banned+from+this+server');
+  }
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  if (!db.isPlusServerMember(serverId, req.session.userId)) {
+    return res.redirect(`/plus/invite/${server.invite_code}`);
+  }
+
+  const channels = db.getPlusServerChannels(serverId);
+  if (channels.length === 0) {
+    const channelId = db.createPlusChannel(serverId, 'general', 'General discussion');
+    return res.redirect(`/plus/server/${serverId}/channel/${channelId}`);
+  }
+
+  res.redirect(`/plus/server/${serverId}/channel/${channels[0].id}`);
+});
+
+app.get('/plus/server/:serverId/channel/:channelId', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+
+  if (db.isPlusServerBanned(serverId, req.session.userId)) {
+    return res.redirect('/plus?error=You+have+been+banned+from+this+server');
+  }
+
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  if (!db.isPlusServerMember(serverId, req.session.userId)) {
+    return res.redirect(`/plus/invite/${server.invite_code}`);
+  }
+
+  const currentChannel = db.getPlusChannelById(channelId);
+  if (!currentChannel || currentChannel.server_id !== serverId) {
+    return res.redirect(`/plus/server/${serverId}`);
+  }
+
+  const channels = db.getPlusServerChannels(serverId);
+  const members = db.getPlusServerMembers(serverId).map(m => ({
+    ...m,
+    isOnline: isUserOnline(m.id),
+  }));
+  const userServers = db.getUserPlusServers(req.session.userId);
+  const myMember = db.getPlusServerMember(serverId, req.session.userId);
+  const isOwner = server.owner_id === req.session.userId;
+  const isAdmin = isOwner || (myMember && myMember.role === 'admin');
+  const bannedUsers = isAdmin ? db.getPlusServerBans(serverId) : [];
+
+  const rawMessages = db.getPlusChannelMessages(channelId, 100, null, req.session.userId);
+  const messages = rawMessages.map(m => ({
+    ...m,
+    created_at_fmt: formatPostTime(m.created_at),
+    edited_at_fmt: m.edited_at ? formatPostTime(m.edited_at) : null,
+  }));
+
+  const host = req.get('host') || 'classchat.emoticonyt.site';
+  const inviteUrl = `${req.protocol}://${host}/plus/invite/${server.invite_code}`;
+
+  res.render('plus/server', {
+    title: `#${currentChannel.name} — ${server.name} — ClassChat Plus`,
+    currentPath: '/plus',
+    server,
+    channels,
+    currentChannel,
+    members,
+    bannedUsers,
+    userServers,
+    messages,
+    isOwner,
+    isAdmin,
+    inviteUrl,
+    inviteCode: server.invite_code,
+    error: req.query.error || null,
+  });
+});
+
+app.post('/plus/server/:serverId/channel/:channelId/message', requireAuth, (req, res) => {
+  postAttachUpload(req, res, (err) => {
+    if (err) {
+      if (req.xhr || req.headers.accept?.includes('json')) return res.status(400).json({ error: err.message });
+      return res.redirect('back');
+    }
+
+    const serverId = Number(req.params.serverId);
+    const channelId = Number(req.params.channelId);
+
+    if (!db.isPlusServerMember(serverId, req.session.userId)) {
+      if (req.xhr || req.headers.accept?.includes('json')) return res.status(403).json({ error: 'Not a member' });
+      return res.redirect('/plus');
+    }
+
+    const body = (req.body.body || '').trim();
+    let attachmentPath = null;
+    let attachmentType = null;
+
+    if (req.files?.image?.[0]) {
+      attachmentPath = `/uploads/${path.basename(req.files.image[0].path)}`;
+      attachmentType = 'image';
+    } else if (req.files?.file?.[0]) {
+      attachmentPath = `/uploads/${path.basename(req.files.file[0].path)}`;
+      attachmentType = 'file';
+    }
+
+    if (!body && !attachmentPath) {
+      if (req.xhr || req.headers.accept?.includes('json')) return res.status(400).json({ error: 'Message cannot be empty' });
+      return res.redirect(`/plus/server/${serverId}/channel/${channelId}`);
+    }
+
+    const msgId = db.addPlusMessage(channelId, serverId, req.session.userId, body, attachmentPath, attachmentType);
+    const newMsg = db.getPlusMessageById(msgId, req.session.userId);
+    const formattedMsg = {
+      ...newMsg,
+      created_at_fmt: formatPostTime(newMsg.created_at),
+      edited_at_fmt: null,
+      reactions: newMsg.reactions || [],
+    };
+
+    broadcastToPlusServer(serverId, {
+      type: 'plus_message',
+      serverId,
+      channelId,
+      message: formattedMsg,
+    });
+
+    if (req.xhr || req.headers.accept?.includes('json')) {
+      return res.json({ success: true, message: formattedMsg });
+    }
+    res.redirect(`/plus/server/${serverId}/channel/${channelId}`);
+  });
+});
+
+app.post('/plus/server/:serverId/channel/:channelId/message/:messageId/edit', requireAuth, express.json(), (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+  const messageId = Number(req.params.messageId);
+
+  if (!db.isPlusServerMember(serverId, req.session.userId)) {
+    return res.status(403).json({ error: 'Not a member of this server' });
+  }
+
+  const existing = db.getPlusMessageById(messageId);
+  if (!existing || existing.channel_id !== channelId || existing.server_id !== serverId) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  if (existing.sender_id !== req.session.userId) {
+    return res.status(403).json({ error: 'You can only edit your own messages' });
+  }
+
+  const newBody = (req.body.body || '').trim();
+  if (!newBody) {
+    return res.status(400).json({ error: 'Message body cannot be empty' });
+  }
+
+  const updated = db.editPlusMessage(messageId, req.session.userId, newBody);
+  if (!updated) {
+    return res.status(500).json({ error: 'Failed to update message' });
+  }
+
+  const updatedMsg = db.getPlusMessageById(messageId, req.session.userId);
+  const formattedMsg = {
+    ...updatedMsg,
+    created_at_fmt: formatPostTime(updatedMsg.created_at),
+    edited_at_fmt: updatedMsg.edited_at ? formatPostTime(updatedMsg.edited_at) : null,
+    reactions: updatedMsg.reactions || [],
+  };
+
+  broadcastToPlusServer(serverId, {
+    type: 'plus_message_edit',
+    serverId,
+    channelId,
+    messageId,
+    message: formattedMsg,
+  });
+
+  return res.json({ success: true, message: formattedMsg });
+});
+
+app.post('/plus/server/:serverId/channel/:channelId/message/:messageId/delete', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+  const messageId = Number(req.params.messageId);
+
+  const server = db.getPlusServerById(serverId);
+  if (!server) {
+    if (req.xhr || req.headers.accept?.includes('json')) return res.status(404).json({ error: 'Server not found' });
+    return res.redirect('/plus');
+  }
+
+  const myMember = db.getPlusServerMember(serverId, req.session.userId);
+  if (!myMember) {
+    if (req.xhr || req.headers.accept?.includes('json')) return res.status(403).json({ error: 'Not a member' });
+    return res.redirect('/plus');
+  }
+
+  const isOwner = server.owner_id === req.session.userId;
+  const isAdmin = isOwner || myMember.role === 'admin';
+
+  const existing = db.getPlusMessageById(messageId);
+  if (!existing || existing.channel_id !== channelId || existing.server_id !== serverId) {
+    if (req.xhr || req.headers.accept?.includes('json')) return res.status(404).json({ error: 'Message not found' });
+    return res.redirect(`/plus/server/${serverId}/channel/${channelId}`);
+  }
+
+  if (existing.sender_id !== req.session.userId && !isAdmin) {
+    if (req.xhr || req.headers.accept?.includes('json')) return res.status(403).json({ error: 'Permission denied' });
+    return res.redirect(`/plus/server/${serverId}/channel/${channelId}`);
+  }
+
+  const deleted = db.deletePlusMessage(messageId, req.session.userId, isAdmin);
+  if (deleted) {
+    broadcastToPlusServer(serverId, {
+      type: 'plus_message_delete',
+      serverId,
+      channelId,
+      messageId,
+    });
+  }
+
+  if (req.xhr || req.headers.accept?.includes('json')) {
+    return res.json({ success: true, messageId });
+  }
+  res.redirect(`/plus/server/${serverId}/channel/${channelId}`);
+});
+
+app.post('/plus/server/:serverId/channel/:channelId/message/:messageId/react', requireAuth, express.json(), (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+  const messageId = Number(req.params.messageId);
+  const emoji = (req.body.emoji || '').trim();
+
+  if (!db.isPlusServerMember(serverId, req.session.userId)) {
+    return res.status(403).json({ error: 'Not a member of this server' });
+  }
+
+  if (!emoji) {
+    return res.status(400).json({ error: 'Emoji is required' });
+  }
+
+  const result = db.togglePlusMessageReaction(messageId, req.session.userId, emoji);
+
+  broadcastToPlusServer(serverId, {
+    type: 'plus_message_reaction',
+    serverId,
+    channelId,
+    messageId,
+    reactions: result.reactions,
+  });
+
+  return res.json({ success: true, ...result });
+});
+
+app.post('/plus/server/:serverId/channel/:channelId/message/:messageId/pin', requireAuth, express.json(), (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+  const messageId = Number(req.params.messageId);
+
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.status(404).json({ error: 'Server not found' });
+
+  const myMember = db.getPlusServerMember(serverId, req.session.userId);
+  if (!myMember) return res.status(403).json({ error: 'Not a member' });
+
+  const isOwner = server.owner_id === req.session.userId;
+  const isAdmin = isOwner || myMember.role === 'admin';
+  if (!isAdmin) {
+    return res.status(403).json({ error: 'Only admins and owners can pin messages' });
+  }
+
+  const existing = db.getPlusMessageById(messageId);
+  if (!existing || existing.channel_id !== channelId || existing.server_id !== serverId) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  const newPinState = existing.is_pinned ? 0 : 1;
+  db.togglePinPlusMessage(messageId, newPinState);
+
+  broadcastToPlusServer(serverId, {
+    type: 'plus_message_pin',
+    serverId,
+    channelId,
+    messageId,
+    is_pinned: newPinState,
+  });
+
+  return res.json({ success: true, messageId, is_pinned: newPinState });
+});
+
+app.get('/plus/server/:serverId/channel/:channelId/pins', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+
+  if (!db.isPlusServerMember(serverId, req.session.userId)) {
+    return res.status(403).json({ error: 'Not a member' });
+  }
+
+  const rawPins = db.getPinnedPlusMessages(channelId, req.session.userId);
+  const pins = rawPins.map(m => ({
+    ...m,
+    created_at_fmt: formatPostTime(m.created_at),
+    edited_at_fmt: m.edited_at ? formatPostTime(m.edited_at) : null,
+  }));
+
+  return res.json({ success: true, pins });
+});
+
+app.get('/plus/server/:serverId/channel/:channelId/search', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+  const query = (req.query.q || '').trim();
+
+  if (!db.isPlusServerMember(serverId, req.session.userId)) {
+    return res.status(403).json({ error: 'Not a member' });
+  }
+
+  if (!query) {
+    return res.json({ success: true, results: [] });
+  }
+
+  const rawResults = db.searchPlusChannelMessages(channelId, query, req.session.userId);
+  const results = rawResults.map(m => ({
+    ...m,
+    created_at_fmt: formatPostTime(m.created_at),
+    edited_at_fmt: m.edited_at ? formatPostTime(m.edited_at) : null,
+  }));
+
+  return res.json({ success: true, results });
+});
+
+app.post('/plus/server/:serverId/channels', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  const myMember = db.getPlusServerMember(serverId, req.session.userId);
+  const isAdmin = server.owner_id === req.session.userId || (myMember && myMember.role === 'admin');
+  if (!isAdmin) return res.status(403).send('Forbidden');
+
+  const name = (req.body.name || '').trim();
+  const topic = (req.body.topic || '').trim();
+  if (!name) return res.redirect(`/plus/server/${serverId}`);
+
+  const channelId = db.createPlusChannel(serverId, name, topic);
+  res.redirect(`/plus/server/${serverId}/channel/${channelId}`);
+});
+
+app.get('/plus/invite/:code', (req, res) => {
+  const code = (req.params.code || '').trim().toUpperCase();
+  const server = db.getPlusServerByInviteCode(code);
+  if (!server) {
+    return res.status(404).render('plus/invite-invalid', {
+      title: 'Invalid Invite — ClassChat Plus',
+      hideSidebar: true,
+      code,
+    });
+  }
+
+  if (req.session.userId && db.isPlusServerMember(server.id, req.session.userId)) {
+    return res.redirect(`/plus/server/${server.id}`);
+  }
+
+  const host = req.get('host') || 'classchat.emoticonyt.site';
+  const inviteUrl = `${req.protocol}://${host}/plus/invite/${server.invite_code}`;
+
+  res.render('plus/invite', {
+    title: `Join ${server.name} — ClassChat Plus`,
+    hideSidebar: true,
+    server,
+    inviteCode: server.invite_code,
+    inviteUrl,
+    isLoggedIn: !!req.session.userId,
+    username: req.session.username,
+    currentUser: req.session.userId ? (res.locals.currentUser || db.getUserById(req.session.userId)) : null,
+  });
+});
+
+app.post('/plus/invite/:code/join', requireAuth, (req, res) => {
+  const code = (req.params.code || '').trim().toUpperCase();
+  const server = db.getPlusServerByInviteCode(code);
+  if (!server) return res.status(404).redirect('/plus');
+
+  if (db.isPlusServerBanned(server.id, req.session.userId)) {
+    return res.redirect('/plus?error=You+have+been+banned+from+this+server');
+  }
+
+  db.addPlusServerMember(server.id, req.session.userId, 'member');
+  db.setPlusEnabled(req.session.userId, 1);
+
+  res.redirect(`/plus/server/${server.id}`);
+});
+
+// --- Channel Management: Edit & Delete ---
+app.post('/plus/server/:serverId/channel/:channelId/edit', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  const myMember = db.getPlusServerMember(serverId, req.session.userId);
+  const isAdmin = server.owner_id === req.session.userId || (myMember && myMember.role === 'admin');
+  if (!isAdmin) return res.status(403).send('Forbidden');
+
+  const name = (req.body.name || '').trim();
+  const topic = (req.body.topic || '').trim();
+  if (!name) return res.redirect(`/plus/server/${serverId}/channel/${channelId}?error=Channel+name+cannot+be+empty`);
+
+  db.updatePlusChannel(channelId, { name, topic });
+  res.redirect(`/plus/server/${serverId}/channel/${channelId}`);
+});
+
+app.post('/plus/server/:serverId/channel/:channelId/delete', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  const myMember = db.getPlusServerMember(serverId, req.session.userId);
+  const isAdmin = server.owner_id === req.session.userId || (myMember && myMember.role === 'admin');
+  if (!isAdmin) return res.status(403).send('Forbidden');
+
+  const channels = db.getPlusServerChannels(serverId);
+  if (channels.length <= 1) {
+    return res.redirect(`/plus/server/${serverId}/channel/${channelId}?error=Cannot+delete+the+only+channel+in+the+server`);
+  }
+
+  db.deletePlusChannel(channelId);
+  const remaining = db.getPlusServerChannels(serverId);
+  const nextChannelId = remaining.length > 0 ? remaining[0].id : '';
+  res.redirect(`/plus/server/${serverId}${nextChannelId ? '/channel/' + nextChannelId : ''}`);
+});
+
+// --- Member Management: Role, Kick, Ban, Unban ---
+app.post('/plus/server/:serverId/members/:targetUserId/role', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const targetUserId = Number(req.params.targetUserId);
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  if (server.owner_id !== req.session.userId) {
+    return res.status(403).send('Only server owners can modify roles');
+  }
+  if (targetUserId === server.owner_id) {
+    return res.redirect(`/plus/server/${serverId}?error=Cannot+modify+the+owner+role`);
+  }
+
+  const role = req.body.role === 'admin' ? 'admin' : 'member';
+  db.updatePlusMemberRole(serverId, targetUserId, role);
+  res.redirect(`/plus/server/${serverId}`);
+});
+
+app.post('/plus/server/:serverId/members/:targetUserId/kick', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const targetUserId = Number(req.params.targetUserId);
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  const myMember = db.getPlusServerMember(serverId, req.session.userId);
+  const isOwner = server.owner_id === req.session.userId;
+  const isAdmin = isOwner || (myMember && myMember.role === 'admin');
+  if (!isAdmin) return res.status(403).send('Forbidden');
+
+  if (targetUserId === server.owner_id) {
+    return res.redirect(`/plus/server/${serverId}?error=Cannot+kick+the+server+owner`);
+  }
+
+  const targetMember = db.getPlusServerMember(serverId, targetUserId);
+  if (!targetMember) return res.redirect(`/plus/server/${serverId}`);
+
+  if (!isOwner && targetMember.role === 'admin') {
+    return res.status(403).send('Admins cannot kick other admins');
+  }
+
+  db.kickPlusServerMember(serverId, targetUserId);
+  res.redirect(`/plus/server/${serverId}`);
+});
+
+app.post('/plus/server/:serverId/members/:targetUserId/ban', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const targetUserId = Number(req.params.targetUserId);
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  const myMember = db.getPlusServerMember(serverId, req.session.userId);
+  const isOwner = server.owner_id === req.session.userId;
+  const isAdmin = isOwner || (myMember && myMember.role === 'admin');
+  if (!isAdmin) return res.status(403).send('Forbidden');
+
+  if (targetUserId === server.owner_id) {
+    return res.redirect(`/plus/server/${serverId}?error=Cannot+ban+the+server+owner`);
+  }
+
+  const targetMember = db.getPlusServerMember(serverId, targetUserId);
+  if (targetMember && !isOwner && targetMember.role === 'admin') {
+    return res.status(403).send('Admins cannot ban other admins');
+  }
+
+  const reason = (req.body.reason || '').trim();
+  db.banPlusServerMember(serverId, targetUserId, req.session.userId, reason);
+  res.redirect(`/plus/server/${serverId}`);
+});
+
+app.post('/plus/server/:serverId/bans/:targetUserId/unban', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const targetUserId = Number(req.params.targetUserId);
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  const myMember = db.getPlusServerMember(serverId, req.session.userId);
+  const isAdmin = server.owner_id === req.session.userId || (myMember && myMember.role === 'admin');
+  if (!isAdmin) return res.status(403).send('Forbidden');
+
+  db.unbanPlusServerMember(serverId, targetUserId);
+  res.redirect(`/plus/server/${serverId}`);
+});
+
+app.post('/plus/server/:serverId/leave', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const server = db.getPlusServerById(serverId);
+  if (!server) return res.redirect('/plus');
+
+  if (server.owner_id === req.session.userId) {
+    return res.redirect(`/plus/server/${serverId}?error=Owner+cannot+leave+the+server.+Delete+it+in+settings+instead.`);
+  }
+
+  db.leavePlusServer(serverId, req.session.userId);
+  res.redirect('/plus');
+});
+
+app.post('/plus/server/:serverId/delete', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const server = db.getPlusServerById(serverId);
+  if (!server || server.owner_id !== req.session.userId) {
+    return res.status(403).send('Forbidden');
+  }
+
+  db.deletePlusServer(serverId);
+  res.redirect('/plus');
+});
+
+app.post('/plus/server/:serverId/settings', requireAuth, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const server = db.getPlusServerById(serverId);
+  if (!server || server.owner_id !== req.session.userId) {
+    return res.status(403).send('Forbidden');
+  }
+
+  plusServerUpload(req, res, (err) => {
+    if (err) return res.redirect(`/plus/server/${serverId}?error=${encodeURIComponent(err.message)}`);
+
+    const name = (req.body.name || '').trim();
+    const description = (req.body.description || '').trim();
+    const isDiscoverable = req.body.is_discoverable === '1' || req.body.is_discoverable === 'on';
+
+    const iconFile = req.files?.icon?.[0];
+    const bannerFile = req.files?.banner?.[0];
+    const totalSize = (iconFile?.size || 0) + (bannerFile?.size || 0);
+    if (totalSize > 5 * 1024 * 1024) {
+      if (iconFile?.path) fs.unlink(iconFile.path, () => {});
+      if (bannerFile?.path) fs.unlink(bannerFile.path, () => {});
+      return res.redirect(`/plus/server/${serverId}?error=Combined+image+and+banner+size+must+not+exceed+5MB`);
+    }
+
+    const updateFields = {
+      name: name || server.name,
+      description,
+      isDiscoverable,
+    };
+    if (iconFile) updateFields.iconPath = `/uploads/${path.basename(iconFile.path)}`;
+    if (bannerFile) updateFields.bannerPath = `/uploads/${path.basename(bannerFile.path)}`;
+
+    db.updatePlusServer(serverId, updateFields);
+    res.redirect(`/plus/server/${serverId}`);
+  });
+});
+
 app.get('/profile', requireAuth, (req, res) => {
   res.redirect(`/u/${req.session.username}`);
 });
@@ -1798,6 +2506,271 @@ app.post('/api/message/:id/react', requireAuth, express.json(), (req, res) => {
   res.json({ ok: true, reactions: db.getMessageReactions(id) });
 });
 
+// ==========================================
+// Native Mobile App REST APIs
+// ==========================================
+
+app.post('/api/register', express.json(), (req, res) => {
+  const username = (req.body.username || '').trim().toLowerCase();
+  const password = req.body.password || '';
+  const schoolId = (req.body.school_id || req.body.schoolId || '').trim();
+  const district = req.body.district || DISTRICT;
+  const school = req.body.school || SCHOOL;
+
+  if (!username || !password || !schoolId) {
+    return res.status(400).json({ success: false, error: 'Username, password, and school ID are required' });
+  }
+  if (username.length < 2) {
+    return res.status(400).json({ success: false, error: 'Username must be at least 2 characters' });
+  }
+  if (!isUsernameCompatible(username)) {
+    return res.status(400).json({ success: false, error: 'Username can only contain letters, numbers, underscores, and periods' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+  }
+  if (db.getUserByUsername(username)) {
+    return res.status(400).json({ success: false, error: 'Username is already taken' });
+  }
+
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const userId = db.createUser(username, passwordHash, schoolId, district, school, 0);
+
+  req.session.userId = userId;
+  req.session.username = username;
+  req.session.school_id = schoolId;
+  req.session.district = district;
+  req.session.school = school;
+  delete req.session.guest;
+
+  const isOwner = ['emoticonyt', 'doriandelvalle'].includes(username);
+
+  res.json({
+    success: true,
+    user: {
+      id: userId,
+      username: username,
+      display_name: username,
+      avatar_path: null,
+      bio: '',
+      is_staff: false,
+      is_owner: isOwner,
+      plus_enabled: false
+    }
+  });
+});
+
+app.post('/api/login', express.json(), (req, res) => {
+  const username = (req.body.username || '').trim();
+  const password = req.body.password || '';
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'Username and password are required' });
+  }
+  const user = db.getUserByUsername(username);
+  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.status(401).json({ success: false, error: 'Invalid username or password' });
+  }
+  if (user.is_banned) {
+    return res.status(403).json({ success: false, error: 'Account suspended: ' + (user.ban_reason || 'Banned') });
+  }
+  if (user.timeout_until && new Date(user.timeout_until).getTime() > Date.now()) {
+    return res.status(403).json({ success: false, error: 'Account timed out until ' + user.timeout_until });
+  }
+
+  req.session.userId = user.id;
+  req.session.username = user.username;
+  req.session.school_id = user.school_id;
+  req.session.district = user.district;
+  req.session.school = user.school;
+  req.session.is_staff = !!user.is_staff;
+  delete req.session.guest;
+
+  const isOwner = ['emoticonyt', 'doriandelvalle'].includes(user.username.toLowerCase());
+
+  res.json({
+    success: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      display_name: user.display_name || user.username,
+      avatar_path: user.avatar_path || null,
+      bio: user.bio || '',
+      is_staff: !!user.is_staff,
+      is_owner: isOwner,
+      plus_enabled: !!db.isPlusEnabled(user.id)
+    }
+  });
+});
+
+app.get('/api/me', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  const user = db.getUserById(req.session.userId);
+  if (!user) return res.status(401).json({ success: false, error: 'User not found' });
+  const isOwner = ['emoticonyt', 'doriandelvalle'].includes(user.username.toLowerCase());
+  res.json({
+    success: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      display_name: user.display_name || user.username,
+      avatar_path: user.avatar_path || null,
+      bio: user.bio || '',
+      is_staff: !!user.is_staff,
+      is_owner: isOwner,
+      plus_enabled: !!db.isPlusEnabled(user.id)
+    }
+  });
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.json({ success: true });
+  });
+});
+
+app.get('/api/feed', requireAuth, (req, res) => {
+  const classId = req.query.class_id ? Number(req.query.class_id) : null;
+  const postsRaw = db.getPosts(50, classId);
+  const posts = postsRaw.map(p => {
+    const likesCount = db.getLikeCount(p.id);
+    const hasLiked = db.getUserLike(p.id, req.session.userId);
+    const dislikesCount = db.getDislikeCount(p.id);
+    const hasDisliked = db.getUserDislike(p.id, req.session.userId);
+    const hasSaved = db.isPostSavedByUser ? db.isPostSavedByUser(req.session.userId, p.id) : false;
+    const commentsCount = db.getReplyCount(p.id);
+    const isOwner = ['emoticonyt', 'doriandelvalle'].includes((p.username || '').toLowerCase());
+    return {
+      id: p.id,
+      user_id: p.user_id,
+      username: p.username,
+      display_name: p.display_name || p.username,
+      avatar_path: p.author_avatar || null,
+      body: p.body,
+      image_path: p.image_path || null,
+      class_id: p.class_id,
+      class_name: p.class_name,
+      likes_count: likesCount,
+      dislikes_count: dislikesCount,
+      comments_count: commentsCount,
+      has_liked: hasLiked,
+      has_disliked: hasDisliked,
+      has_saved: hasSaved,
+      is_owner: isOwner,
+      created_at: formatPostTime(p.created_at)
+    };
+  });
+  const classes = db.getClasses();
+  res.json({ success: true, posts, classes });
+});
+
+app.post('/api/posts', requireAuth, express.json(), (req, res) => {
+  const body = (req.body.body || '').trim();
+  const classId = req.body.class_id ? Number(req.body.class_id) : null;
+  if (!body) return res.status(400).json({ success: false, error: 'Body is required' });
+  const postId = db.createPost(req.session.userId, body, null, classId);
+  res.json({ success: true, postId: Number(postId) });
+});
+
+app.post('/api/posts/:id/like', requireAuth, (req, res) => {
+  const postId = Number(req.params.id);
+  const liked = db.togglePostLike(postId, req.session.userId);
+  const likesCount = db.getLikeCount(postId);
+  const dislikesCount = db.getDislikeCount(postId);
+  res.json({ success: true, liked, likes_count: likesCount, dislikes_count: dislikesCount });
+});
+
+app.post('/api/posts/:id/dislike', requireAuth, (req, res) => {
+  const postId = Number(req.params.id);
+  const disliked = db.togglePostDislike(postId, req.session.userId);
+  const likesCount = db.getLikeCount(postId);
+  const dislikesCount = db.getDislikeCount(postId);
+  res.json({ success: true, disliked, likes_count: likesCount, dislikes_count: dislikesCount });
+});
+
+app.post('/api/posts/:id/save', requireAuth, (req, res) => {
+  const postId = Number(req.params.id);
+  const saved = db.toggleSavePost(req.session.userId, postId);
+  res.json({ success: true, saved });
+});
+
+app.post('/api/posts/:id/delete', requireAuth, (req, res) => {
+  const postId = Number(req.params.id);
+  const post = db.getPostById(postId);
+  if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
+  if (post.user_id !== req.session.userId && !req.session.is_staff) {
+    return res.status(403).json({ success: false, error: 'Permission denied' });
+  }
+  db.deletePost(postId);
+  res.json({ success: true });
+});
+
+app.get('/api/posts/:id/comments', requireAuth, (req, res) => {
+  const postId = Number(req.params.id);
+  const replies = db.getRepliesByPostId(postId, 100).map(r => ({
+    id: r.id,
+    post_id: r.post_id,
+    user_id: r.user_id,
+    username: r.username,
+    display_name: r.display_name || r.username,
+    author_avatar: r.author_avatar || null,
+    body: r.body,
+    image_path: r.image_path || null,
+    created_at: formatPostTime(r.created_at)
+  }));
+  res.json({ success: true, comments: replies });
+});
+
+app.post('/api/posts/:id/comments', requireAuth, express.json(), (req, res) => {
+  const postId = Number(req.params.id);
+  const body = (req.body.body || '').trim();
+  if (!body) return res.status(400).json({ success: false, error: 'Comment body required' });
+  const replyId = db.createReply(postId, req.session.userId, body, null);
+  res.json({ success: true, commentId: Number(replyId) });
+});
+
+app.get('/api/plus/servers', requireAuth, (req, res) => {
+  if (!db.isPlusEnabled(req.session.userId)) {
+    return res.status(403).json({ success: false, error: 'ClassChat Plus is not enabled for this account' });
+  }
+  const servers = db.getUserPlusServers(req.session.userId);
+  res.json({ success: true, servers });
+});
+
+app.get('/api/plus/servers/:id/channels', requireAuth, (req, res) => {
+  const serverId = Number(req.params.id);
+  if (!db.isPlusServerMember(serverId, req.session.userId)) {
+    return res.status(403).json({ success: false, error: 'Not a member of this server' });
+  }
+  const channels = db.getPlusServerChannels(serverId);
+  res.json({ success: true, channels });
+});
+
+app.get('/api/plus/servers/:id/channels/:channelId/messages', requireAuth, (req, res) => {
+  const serverId = Number(req.params.id);
+  const channelId = Number(req.params.channelId);
+  if (!db.isPlusServerMember(serverId, req.session.userId)) {
+    return res.status(403).json({ success: false, error: 'Not a member' });
+  }
+  const raw = db.getPlusChannelMessages(channelId, 50);
+  const messages = raw.map(m => ({
+    ...m,
+    created_at_fmt: formatPostTime(m.created_at)
+  }));
+  res.json({ success: true, messages });
+});
+
+app.post('/api/plus/servers/:id/channels/:channelId/messages', requireAuth, express.json(), (req, res) => {
+  const serverId = Number(req.params.id);
+  const channelId = Number(req.params.channelId);
+  if (!db.isPlusServerMember(serverId, req.session.userId)) {
+    return res.status(403).json({ success: false, error: 'Not a member' });
+  }
+  const body = (req.body.body || '').trim();
+  if (!body) return res.status(400).json({ success: false, error: 'Body required' });
+  const msgId = db.createPlusMessage(channelId, serverId, req.session.userId, body, null, null);
+  res.json({ success: true, messageId: msgId });
+});
+
 app.get('/stories', requireAuth, (req, res) => {
   res.redirect('/feed');
 });
@@ -1870,6 +2843,8 @@ app.get('/staff/dashboard', requireStaff, (req, res) => {
     updated_at_fmt: formatPostTime(t.updated_at),
     resolved_at_fmt: t.resolved_at ? formatPostTime(t.resolved_at) : null,
   }));
+  const isOwner = isEmoticonyt(req.session.username);
+
   res.render('staff/dashboard', {
     title: 'Staff Dashboard — ClassChat',
     layout: 'layout',
@@ -1887,6 +2862,7 @@ app.get('/staff/dashboard', requireStaff, (req, res) => {
     user,
     district: DISTRICT,
     school: SCHOOL,
+    isOwner,
   });
 });
 
@@ -1956,11 +2932,12 @@ app.get('/staff/users/:id/edit', requireStaff, (req, res) => {
   if (id === req.session.userId) return res.redirect('/staff/dashboard');
   const user = db.getUserById(id);
   if (!user) return res.redirect('/staff/dashboard');
+  const targetUser = { ...user, plus_enabled: db.isPlusEnabled(id) };
   res.render('staff/user-edit', {
     title: `Edit @${user.username} — ClassChat`,
     layout: 'layout',
-    editUser: user,
-    targetUser: user,
+    editUser: targetUser,
+    targetUser: targetUser,
     username: req.session.username,
     error: req.query.error,
     success: req.query.success === '1',
@@ -1980,6 +2957,7 @@ app.post('/staff/users/:id/edit', requireStaff, avatarUpload.single('avatar'), (
   const newBio = (req.body.bio || '').trim() || null;
   const newDisplayName = (req.body.display_name || '').trim() || null;
   const isStaff = req.body.is_staff === '1';
+  const plusEnabled = req.body.plus_enabled === '1';
   const removeAvatar = req.body.remove_avatar === '1';
 
   // Validation
@@ -2024,7 +3002,9 @@ app.post('/staff/users/:id/edit', requireStaff, avatarUpload.single('avatar'), (
     isStaff,
   });
 
-  db.logModeratorAction(req.session.userId, req.session.username, 'EDIT_USER', id, newUsername, `Updated user details (is_staff: ${isStaff ? 'YES' : 'NO'})`);
+  db.setPlusEnabled(id, plusEnabled ? 1 : 0);
+
+  db.logModeratorAction(req.session.userId, req.session.username, 'EDIT_USER', id, newUsername, `Updated user details (is_staff: ${isStaff ? 'YES' : 'NO'}, plus_enabled: ${plusEnabled ? 'YES' : 'NO'})`);
   res.redirect(`/staff/users/${id}/edit?success=1`);
 });
 
@@ -2060,6 +3040,27 @@ app.post('/staff/users/:id/timeout', requireStaff, (req, res) => {
   db.timeoutUser(id, durationMinutes, reason);
   disconnectUserSockets(id, `Timed out for ${durationMinutes} minutes`);
   db.logModeratorAction(req.session.userId, req.session.username, targetUser.is_staff ? 'MOD_TIMEOUT' : 'TIMEOUT', id, targetUser.username, `${durationMinutes}m: ${reason || 'Violation of rules'}`);
+
+  const referer = req.get('Referrer') || '/staff/dashboard';
+  res.redirect(referer);
+});
+
+app.post('/staff/users/:id/toggle-plus', requireStaff, (req, res) => {
+  const id = Number(req.params.id);
+  const targetUser = db.getUserById(id);
+  if (!targetUser) return res.redirect('/staff/dashboard');
+
+  const enabled = req.body.enabled === '0' ? 0 : 1;
+  db.setPlusEnabled(id, enabled);
+
+  db.logModeratorAction(
+    req.session.userId,
+    req.session.username,
+    'PLUS_TOGGLE',
+    id,
+    targetUser.username,
+    `Set ClassChat Plus to ${enabled ? 'ENABLED' : 'DISABLED'} for @${targetUser.username}`
+  );
 
   const referer = req.get('Referrer') || '/staff/dashboard';
   res.redirect(referer);
@@ -2287,7 +3288,7 @@ app.post('/staff/support/:username', requireStaff, (req, res) => {
   res.redirect(`/staff/support/${encodeURIComponent(other.username)}`);
 });
 
-app.get('/api/call/token', requireAuth, (req, res) => {
+app.get(['/api/call/token', '/api/call-token'], requireAuth, (req, res) => {
   const token = createCallToken(req.session.userId);
   res.json({ token });
 });
@@ -2399,6 +3400,123 @@ wss.on('connection', (ws, req) => {
         fromUsername,
         fromDisplayName: fromUser ? (fromUser.display_name || fromUser.username) : fromUsername,
         typing: !!msg.typing,
+      });
+      return;
+    }
+
+    // --- Real-time Plus Channel: Typing Indicator ---
+    if (msg.type === 'plus_typing') {
+      const serverId = Number(msg.serverId);
+      const channelId = Number(msg.channelId);
+      if (!serverId || !channelId) return;
+      if (!db.isPlusServerMember(serverId, userId)) return;
+      broadcastToPlusServer(serverId, {
+        type: 'plus_typing',
+        serverId,
+        channelId,
+        fromUserId: userId,
+        fromUsername,
+        fromDisplayName: fromUser ? (fromUser.display_name || fromUser.username) : fromUsername,
+        typing: !!msg.typing,
+      });
+      return;
+    }
+
+    // --- Real-time Plus Channel: Reactions ---
+    if (msg.type === 'plus_reaction') {
+      const serverId = Number(msg.serverId);
+      const channelId = Number(msg.channelId);
+      const messageId = Number(msg.messageId);
+      const emoji = (msg.emoji || '').trim();
+      if (!serverId || !channelId || !messageId || !emoji) return;
+      if (!db.isPlusServerMember(serverId, userId)) return;
+      const res = db.togglePlusMessageReaction(messageId, userId, emoji);
+      broadcastToPlusServer(serverId, {
+        type: 'plus_message_reaction',
+        serverId,
+        channelId,
+        messageId,
+        reactions: res.reactions,
+      });
+      return;
+    }
+
+    // --- Real-time Plus Channel: Edit ---
+    if (msg.type === 'plus_edit') {
+      const serverId = Number(msg.serverId);
+      const channelId = Number(msg.channelId);
+      const messageId = Number(msg.messageId);
+      const newBody = (msg.body || '').trim();
+      if (!serverId || !channelId || !messageId || !newBody) return;
+      if (!db.isPlusServerMember(serverId, userId)) return;
+      const existing = db.getPlusMessageById(messageId);
+      if (!existing || existing.sender_id !== userId) return;
+      const updated = db.editPlusMessage(messageId, userId, newBody);
+      if (updated) {
+        const updatedMsg = db.getPlusMessageById(messageId, userId);
+        const formattedMsg = {
+          ...updatedMsg,
+          created_at_fmt: formatPostTime(updatedMsg.created_at),
+          edited_at_fmt: updatedMsg.edited_at ? formatPostTime(updatedMsg.edited_at) : null,
+          reactions: updatedMsg.reactions || [],
+        };
+        broadcastToPlusServer(serverId, {
+          type: 'plus_message_edit',
+          serverId,
+          channelId,
+          messageId,
+          message: formattedMsg,
+        });
+      }
+      return;
+    }
+
+    // --- Real-time Plus Channel: Delete ---
+    if (msg.type === 'plus_delete') {
+      const serverId = Number(msg.serverId);
+      const channelId = Number(msg.channelId);
+      const messageId = Number(msg.messageId);
+      if (!serverId || !channelId || !messageId) return;
+      if (!db.isPlusServerMember(serverId, userId)) return;
+      const server = db.getPlusServerById(serverId);
+      const myMember = db.getPlusServerMember(serverId, userId);
+      const isAdmin = (server && server.owner_id === userId) || (myMember && myMember.role === 'admin');
+      const existing = db.getPlusMessageById(messageId);
+      if (!existing) return;
+      if (existing.sender_id !== userId && !isAdmin) return;
+      const deleted = db.deletePlusMessage(messageId, userId, isAdmin);
+      if (deleted) {
+        broadcastToPlusServer(serverId, {
+          type: 'plus_message_delete',
+          serverId,
+          channelId,
+          messageId,
+        });
+      }
+      return;
+    }
+
+    // --- Real-time Plus Channel: Pin ---
+    if (msg.type === 'plus_pin') {
+      const serverId = Number(msg.serverId);
+      const channelId = Number(msg.channelId);
+      const messageId = Number(msg.messageId);
+      if (!serverId || !channelId || !messageId) return;
+      if (!db.isPlusServerMember(serverId, userId)) return;
+      const server = db.getPlusServerById(serverId);
+      const myMember = db.getPlusServerMember(serverId, userId);
+      const isAdmin = (server && server.owner_id === userId) || (myMember && myMember.role === 'admin');
+      if (!isAdmin) return;
+      const existing = db.getPlusMessageById(messageId);
+      if (!existing) return;
+      const newPinState = existing.is_pinned ? 0 : 1;
+      db.togglePinPlusMessage(messageId, newPinState);
+      broadcastToPlusServer(serverId, {
+        type: 'plus_message_pin',
+        serverId,
+        channelId,
+        messageId,
+        is_pinned: newPinState,
       });
       return;
     }

@@ -1,0 +1,35 @@
+<div class="plus-invite-page-wrap">
+  <div class="plus-invite-ambient-glow" style="background: radial-gradient(ellipse at center, rgba(239, 68, 68, 0.22) 0%, rgba(236, 72, 153, 0.12) 45%, transparent 70%);"></div>
+
+  <!-- Top Brand Navigation Bar -->
+  <a href="/plus" class="plus-invite-brand-bar" title="ClassChat Plus">
+    <span style="font-size:1.15rem; line-height:1;">💬</span>
+    <span>ClassChat</span>
+    <span class="plus-invite-brand-pill-badge">Plus</span>
+  </a>
+
+  <!-- Centered Glassmorphic Error Card -->
+  <div class="plus-invite-card" style="max-width: 440px;">
+    <div class="plus-invite-invalid-box">
+      <div class="plus-invite-invalid-icon-circle">
+        <span>🧭</span>
+      </div>
+
+      <h1 class="plus-invite-invalid-title">Invalid or Expired Invite</h1>
+
+      <p class="plus-invite-invalid-desc">
+        The invite code <code class="plus-invite-invalid-code"><%= code || 'UNKNOWN' %></code> may have expired, been mistyped, or the server was deleted.
+      </p>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <a href="/plus" class="btn-plus-invite-accept" style="text-decoration:none;">
+          <span>Explore Discoverable Servers</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+        </a>
+        <a href="/feed" class="btn-plus-invite-signup" style="margin-top:0;">
+          Back to ClassChat Feed
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

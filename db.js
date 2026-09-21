@@ -266,12 +266,89 @@ function initDb() {
     );
     CREATE INDEX IF NOT EXISTS idx_mod_audit_log_created ON moderator_audit_log(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_mod_audit_log_action ON moderator_audit_log(action);
+
+    CREATE TABLE IF NOT EXISTS plus_servers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      icon_path TEXT DEFAULT NULL,
+      banner_path TEXT DEFAULT NULL,
+      is_discoverable INTEGER NOT NULL DEFAULT 1,
+      invite_code TEXT UNIQUE NOT NULL,
+      owner_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_plus_servers_code ON plus_servers(invite_code);
+    CREATE INDEX IF NOT EXISTS idx_plus_servers_disc ON plus_servers(is_discoverable);
+    CREATE INDEX IF NOT EXISTS idx_plus_servers_owner ON plus_servers(owner_id);
+
+    CREATE TABLE IF NOT EXISTS plus_server_members (
+      server_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      joined_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (server_id, user_id),
+      FOREIGN KEY (server_id) REFERENCES plus_servers(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_plus_members_user ON plus_server_members(user_id);
+    CREATE INDEX IF NOT EXISTS idx_plus_members_server ON plus_server_members(server_id);
+
+    CREATE TABLE IF NOT EXISTS plus_channels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      topic TEXT DEFAULT '',
+      type TEXT NOT NULL DEFAULT 'text',
+      position INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (server_id) REFERENCES plus_servers(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_plus_channels_server ON plus_channels(server_id, position);
+
+    CREATE TABLE IF NOT EXISTS plus_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel_id INTEGER NOT NULL,
+      server_id INTEGER NOT NULL,
+      sender_id INTEGER NOT NULL,
+      body TEXT NOT NULL,
+      attachment_path TEXT DEFAULT NULL,
+      attachment_type TEXT DEFAULT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (channel_id) REFERENCES plus_channels(id) ON DELETE CASCADE,
+      FOREIGN KEY (server_id) REFERENCES plus_servers(id) ON DELETE CASCADE,
+      FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_plus_messages_channel ON plus_messages(channel_id, id DESC);
+
+    CREATE TABLE IF NOT EXISTS plus_server_bans (
+      server_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      banned_by INTEGER NOT NULL,
+      reason TEXT DEFAULT '',
+      banned_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (server_id, user_id),
+      FOREIGN KEY (server_id) REFERENCES plus_servers(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (banned_by) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_plus_bans_server ON plus_server_bans(server_id);
   `);
   try {
     db.exec(`ALTER TABLE user_settings ADD COLUMN seen_whats_new_version TEXT`);
   } catch (_) {}
   try {
     db.exec(`ALTER TABLE user_settings ADD COLUMN accent_color TEXT DEFAULT NULL`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE user_settings ADD COLUMN plus_enabled INTEGER DEFAULT 1`);
+  } catch (_) {}
+  try {
+    db.exec(`UPDATE user_settings SET plus_enabled = 1 WHERE plus_enabled = 0 OR plus_enabled IS NULL`);
+  } catch (_) {}
+  try {
+    db.exec(`INSERT OR IGNORE INTO user_settings (user_id, plus_enabled) SELECT id, 1 FROM users`);
   } catch (_) {}
   try {
     db.exec(`ALTER TABLE users ADD COLUMN timeout_until TEXT DEFAULT NULL`);
@@ -288,10 +365,36 @@ function initDb() {
   try {
     db.exec(`ALTER TABLE users ADD COLUMN banned_at TEXT DEFAULT NULL`);
   } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE plus_messages ADD COLUMN edited_at TEXT DEFAULT NULL`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE plus_messages ADD COLUMN is_deleted INTEGER DEFAULT 0`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE plus_messages ADD COLUMN is_pinned INTEGER DEFAULT 0`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE plus_channels ADD COLUMN category TEXT DEFAULT 'Text Channels'`);
+  } catch (_) {}
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS plus_message_reactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        emoji TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(message_id, user_id, emoji),
+        FOREIGN KEY (message_id) REFERENCES plus_messages(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_plus_reactions_msg ON plus_message_reactions(message_id);
+    `);
+  } catch (_) {}
   db.close();
   seedStaffUser();
   seedCCSupport();
-  seedWNTestUser();
   seedDefaultChatrooms();
 }
 
@@ -299,26 +402,6 @@ const STAFF_USERNAME = 'doriandelvalle';
 const STAFF_PASSWORD = '825nancyd';
 const CC_SUPPORT_USERNAME = 'CCSupport';
 const CC_SUPPORT_PASSWORD = 'ccsupport';
-const WN_TEST_USERNAME = 'wn-test';
-const WN_TEST_PASSWORD = 'wn-test';
-
-function seedWNTestUser() {
-  const bcrypt = require('bcryptjs');
-  const db = getDb();
-  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(WN_TEST_USERNAME);
-  const hash = bcrypt.hashSync(WN_TEST_PASSWORD, 10);
-  if (existing) {
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, existing.id);
-  } else {
-    const defaultDistrict = process.env.DISTRICT || '';
-    const defaultSchool = process.env.SCHOOL || '';
-    db.prepare(
-      `INSERT INTO users (username, password_hash, school_id, district, school, is_staff)
-       VALUES (?, ?, 'test', ?, ?, 0)`
-    ).run(WN_TEST_USERNAME, hash, defaultDistrict, defaultSchool);
-  }
-  db.close();
-}
 
 function seedStaffUser() {
   const bcrypt = require('bcryptjs');
@@ -372,8 +455,12 @@ function createUser(username, passwordHash, schoolId, district, school, isStaff 
     'INSERT INTO users (username, password_hash, school_id, district, school, is_staff) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const result = stmt.run(username, passwordHash, schoolId, district || '', school || '', isStaff ? 1 : 0);
+  const newUserId = result.lastInsertRowid;
+  try {
+    db.prepare('INSERT OR IGNORE INTO user_settings (user_id, plus_enabled) VALUES (?, 1)').run(newUserId);
+  } catch (_) {}
   db.close();
-  return result.lastInsertRowid;
+  return newUserId;
 }
 
 function getUserByUsername(username) {
@@ -503,7 +590,12 @@ function getAllUsers() {
   const database = getDb();
   const rows = database
     .prepare(
-      'SELECT id, username, school_id, district, school, is_staff, display_name, avatar_path, timeout_until, timeout_reason, is_banned, ban_reason, banned_at, created_at FROM users ORDER BY id'
+      `SELECT u.id, u.username, u.school_id, u.district, u.school, u.is_staff, u.display_name, u.avatar_path,
+              u.timeout_until, u.timeout_reason, u.is_banned, u.ban_reason, u.banned_at, u.created_at,
+              COALESCE(s.plus_enabled, 1) as plus_enabled
+       FROM users u
+       LEFT JOIN user_settings s ON u.id = s.user_id
+       ORDER BY u.id`
     )
     .all();
   database.close();
@@ -1055,12 +1147,13 @@ function hexToRgb(hex) {
 
 function getUserSettings(userId) {
   const database = getDb();
-  const row = database.prepare('SELECT theme, email_digest, accent_color FROM user_settings WHERE user_id = ?').get(userId);
+  const row = database.prepare('SELECT theme, email_digest, accent_color, plus_enabled FROM user_settings WHERE user_id = ?').get(userId);
   database.close();
 
   const baseTheme = row ? row.theme : 'dark';
   const emailDigest = row ? row.email_digest : 'none';
   const customAccent = row && row.accent_color ? row.accent_color : null;
+  const plusEnabled = true;
 
   let accent_color = null;
   let accent_hover = null;
@@ -1090,7 +1183,23 @@ function getUserSettings(userId) {
     accent_r,
     accent_g,
     accent_b,
+    plus_enabled: true,
   };
+}
+
+function isPlusEnabled(userId) {
+  return true;
+}
+
+function setPlusEnabled(userId, enabled = 1) {
+  const database = getDb();
+  const val = enabled ? 1 : 0;
+  database.prepare(`
+    INSERT INTO user_settings (user_id, plus_enabled)
+    VALUES (?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET plus_enabled = ?
+  `).run(userId, val, val);
+  database.close();
 }
 
 function setUserTheme(userId, theme) {
@@ -1184,14 +1293,14 @@ function getModeratorAuditLogCount({ action = null, search = null } = {}) {
   return row ? row.total : 0;
 }
 
-function hasSeenWhatsNew(userId, version = '3.1') {
+function hasSeenWhatsNew(userId, version = '4.0') {
   const database = getDb();
   const row = database.prepare('SELECT seen_whats_new_version FROM user_settings WHERE user_id = ?').get(userId);
   database.close();
   return row && row.seen_whats_new_version === version;
 }
 
-function markSeenWhatsNew(userId, version = '3.1') {
+function markSeenWhatsNew(userId, version = '4.0') {
   const database = getDb();
   database.prepare('INSERT INTO user_settings (user_id, seen_whats_new_version) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET seen_whats_new_version = ?').run(userId, version, version);
   database.close();
@@ -1857,6 +1966,555 @@ function isUserBanned(user) {
   return !!(user && user.is_banned);
 }
 
+// --- ClassChat Plus (Discord-like Servers & Channels) ---
+
+function generateUniquePlusInviteCode(database) {
+  let shouldClose = false;
+  let dbInstance = database;
+  if (!dbInstance) {
+    dbInstance = getDb();
+    shouldClose = true;
+  }
+  const chars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let result = null;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const exists = dbInstance.prepare('SELECT id FROM plus_servers WHERE invite_code = ?').get(code);
+    if (!exists) {
+      result = code;
+      break;
+    }
+  }
+  if (!result) {
+    result = Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+  if (shouldClose) {
+    dbInstance.close();
+  }
+  return result;
+}
+
+function createPlusServer(ownerId, name, description = '', iconPath = null, bannerPath = null, isDiscoverable = 1) {
+  const database = getDb();
+  const inviteCode = generateUniquePlusInviteCode(database);
+  const isDisc = isDiscoverable ? 1 : 0;
+
+  const createTx = database.transaction(() => {
+    const serverStmt = database.prepare(`
+      INSERT INTO plus_servers (name, description, icon_path, banner_path, is_discoverable, invite_code, owner_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    const serverResult = serverStmt.run(name.trim(), (description || '').trim(), iconPath, bannerPath, isDisc, inviteCode, ownerId);
+    const serverId = Number(serverResult.lastInsertRowid);
+
+    // Add owner as member with 'owner' role
+    database.prepare(`
+      INSERT INTO plus_server_members (server_id, user_id, role)
+      VALUES (?, ?, 'owner')
+    `).run(serverId, ownerId);
+
+    // Create default #general channel
+    const channelResult = database.prepare(`
+      INSERT INTO plus_channels (server_id, name, topic, type, position)
+      VALUES (?, 'general', 'General discussion', 'text', 0)
+    `).run(serverId);
+    const defaultChannelId = Number(channelResult.lastInsertRowid);
+
+    return { serverId, inviteCode, defaultChannelId };
+  });
+
+  const result = createTx();
+  database.close();
+  return result;
+}
+
+function getPlusServerById(serverId) {
+  const database = getDb();
+  const server = database.prepare(`
+    SELECT s.*, u.username AS owner_username, u.display_name AS owner_display_name,
+      (SELECT COUNT(*) FROM plus_server_members WHERE server_id = s.id) AS member_count
+    FROM plus_servers s
+    JOIN users u ON s.owner_id = u.id
+    WHERE s.id = ?
+  `).get(serverId);
+  database.close();
+  return server || null;
+}
+
+function getPlusServerByInviteCode(code) {
+  if (!code || typeof code !== 'string') return null;
+  const database = getDb();
+  const cleanCode = code.trim().toUpperCase();
+  const server = database.prepare(`
+    SELECT s.*, u.username AS owner_username, u.display_name AS owner_display_name, u.avatar_path AS owner_avatar_path,
+      (SELECT COUNT(*) FROM plus_server_members WHERE server_id = s.id) AS member_count,
+      (SELECT COUNT(*) FROM plus_channels WHERE server_id = s.id) AS channel_count
+    FROM plus_servers s
+    JOIN users u ON s.owner_id = u.id
+    WHERE UPPER(s.invite_code) = ?
+  `).get(cleanCode);
+  database.close();
+  return server || null;
+}
+
+function getDiscoverablePlusServers(currentUserId = null) {
+  const database = getDb();
+  const uid = currentUserId ? Number(currentUserId) : 0;
+  const servers = database.prepare(`
+    SELECT s.*, u.username AS owner_username, u.display_name AS owner_display_name,
+      (SELECT COUNT(*) FROM plus_server_members WHERE server_id = s.id) AS member_count,
+      (SELECT COUNT(*) FROM plus_server_members WHERE server_id = s.id AND user_id = ?) AS is_member
+    FROM plus_servers s
+    JOIN users u ON s.owner_id = u.id
+    WHERE s.is_discoverable = 1
+    ORDER BY member_count DESC, s.id DESC
+  `).all(uid);
+  database.close();
+  return servers.map(s => ({ ...s, is_member: s.is_member > 0 }));
+}
+
+function getUserPlusServers(userId) {
+  const database = getDb();
+  const servers = database.prepare(`
+    SELECT s.*, m.role AS member_role,
+      (SELECT COUNT(*) FROM plus_server_members WHERE server_id = s.id) AS member_count
+    FROM plus_servers s
+    JOIN plus_server_members m ON s.id = m.server_id
+    WHERE m.user_id = ?
+    ORDER BY s.name COLLATE NOCASE ASC
+  `).all(userId);
+  database.close();
+  return servers;
+}
+
+function isPlusServerMember(serverId, userId) {
+  const database = getDb();
+  const row = database.prepare('SELECT 1 FROM plus_server_members WHERE server_id = ? AND user_id = ?').get(serverId, userId);
+  database.close();
+  return !!row;
+}
+
+function getPlusServerMember(serverId, userId) {
+  const database = getDb();
+  const row = database.prepare('SELECT role, joined_at FROM plus_server_members WHERE server_id = ? AND user_id = ?').get(serverId, userId);
+  database.close();
+  return row || null;
+}
+
+function addPlusServerMember(serverId, userId, role = 'member') {
+  const database = getDb();
+  database.prepare(`
+    INSERT INTO plus_server_members (server_id, user_id, role)
+    VALUES (?, ?, ?)
+    ON CONFLICT(server_id, user_id) DO UPDATE SET role = role
+  `).run(serverId, userId, role);
+  database.close();
+}
+
+function leavePlusServer(serverId, userId) {
+  const database = getDb();
+  database.prepare('DELETE FROM plus_server_members WHERE server_id = ? AND user_id = ?').run(serverId, userId);
+  database.close();
+}
+
+function getPlusServerMembers(serverId) {
+  const database = getDb();
+  const members = database.prepare(`
+    SELECT m.role, m.joined_at, u.id, u.username, u.display_name, u.avatar_path, u.is_staff
+    FROM plus_server_members m
+    JOIN users u ON m.user_id = u.id
+    WHERE m.server_id = ?
+    ORDER BY CASE m.role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END,
+      LOWER(COALESCE(u.display_name, u.username)) ASC
+  `).all(serverId);
+  database.close();
+  return members;
+}
+
+function getPlusServerChannels(serverId) {
+  const database = getDb();
+  const channels = database.prepare(`
+    SELECT * FROM plus_channels
+    WHERE server_id = ?
+    ORDER BY position ASC, id ASC
+  `).all(serverId);
+  database.close();
+  return channels;
+}
+
+function getPlusChannelById(channelId) {
+  const database = getDb();
+  const channel = database.prepare('SELECT * FROM plus_channels WHERE id = ?').get(channelId);
+  database.close();
+  return channel || null;
+}
+
+function createPlusChannel(serverId, name, topic = '', type = 'text') {
+  const database = getDb();
+  const cleanName = (name || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 30) || 'channel';
+  
+  const maxPosRow = database.prepare('SELECT MAX(position) AS max_pos FROM plus_channels WHERE server_id = ?').get(serverId);
+  const nextPos = (maxPosRow && typeof maxPosRow.max_pos === 'number') ? maxPosRow.max_pos + 1 : 0;
+
+  const result = database.prepare(`
+    INSERT INTO plus_channels (server_id, name, topic, type, position)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(serverId, cleanName, (topic || '').trim().slice(0, 255), type, nextPos);
+  
+  database.close();
+  return Number(result.lastInsertRowid);
+}
+
+function getReactionsForMessages(database, messageIds, currentUserId = null) {
+  if (!messageIds || messageIds.length === 0) return {};
+  const placeholders = messageIds.map(() => '?').join(',');
+  const rows = database.prepare(`
+    SELECT r.message_id, r.emoji, r.user_id, u.username, u.display_name
+    FROM plus_message_reactions r
+    JOIN users u ON r.user_id = u.id
+    WHERE r.message_id IN (${placeholders})
+    ORDER BY r.created_at ASC
+  `).all(...messageIds);
+
+  const reactionsByMsg = {};
+  for (const row of rows) {
+    if (!reactionsByMsg[row.message_id]) {
+      reactionsByMsg[row.message_id] = {};
+    }
+    if (!reactionsByMsg[row.message_id][row.emoji]) {
+      reactionsByMsg[row.message_id][row.emoji] = {
+        emoji: row.emoji,
+        count: 0,
+        hasReacted: false,
+        users: []
+      };
+    }
+    reactionsByMsg[row.message_id][row.emoji].count++;
+    if (currentUserId && Number(row.user_id) === Number(currentUserId)) {
+      reactionsByMsg[row.message_id][row.emoji].hasReacted = true;
+    }
+    reactionsByMsg[row.message_id][row.emoji].users.push(row.display_name || row.username);
+  }
+
+  const result = {};
+  for (const msgId of messageIds) {
+    if (reactionsByMsg[msgId]) {
+      result[msgId] = Object.values(reactionsByMsg[msgId]).map(item => ({
+        ...item,
+        userList: item.users.join(', ')
+      }));
+    } else {
+      result[msgId] = [];
+    }
+  }
+  return result;
+}
+
+function getPlusChannelMessages(channelId, limit = 50, beforeId = null, currentUserId = null) {
+  const database = getDb();
+  let sql = `
+    SELECT m.*, u.username, u.display_name, u.avatar_path, u.is_staff
+    FROM plus_messages m
+    JOIN users u ON m.sender_id = u.id
+    WHERE m.channel_id = ? AND (m.is_deleted = 0 OR m.is_deleted IS NULL)
+  `;
+  const params = [channelId];
+  if (beforeId) {
+    sql += ' AND m.id < ?';
+    params.push(beforeId);
+  }
+  sql += ' ORDER BY m.id DESC LIMIT ?';
+  params.push(Math.max(1, Math.min(Number(limit) || 50, 100)));
+
+  const rows = database.prepare(sql).all(...params);
+  const messageIds = rows.map(r => r.id);
+  const reactionsMap = getReactionsForMessages(database, messageIds, currentUserId);
+
+  const messages = rows.reverse().map(m => ({
+    ...m,
+    reactions: reactionsMap[m.id] || []
+  }));
+
+  database.close();
+  return messages;
+}
+
+function addPlusMessage(channelId, serverId, senderId, body, attachmentPath = null, attachmentType = null) {
+  const database = getDb();
+  const result = database.prepare(`
+    INSERT INTO plus_messages (channel_id, server_id, sender_id, body, attachment_path, attachment_type)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(channelId, serverId, senderId, body.trim(), attachmentPath, attachmentType);
+  database.close();
+  return Number(result.lastInsertRowid);
+}
+
+function getPlusMessageById(messageId, currentUserId = null) {
+  const database = getDb();
+  const row = database.prepare(`
+    SELECT m.*, u.username, u.display_name, u.avatar_path, u.is_staff
+    FROM plus_messages m
+    JOIN users u ON m.sender_id = u.id
+    WHERE m.id = ?
+  `).get(messageId);
+
+  if (!row) {
+    database.close();
+    return null;
+  }
+
+  const reactionsMap = getReactionsForMessages(database, [messageId], currentUserId);
+  row.reactions = reactionsMap[messageId] || [];
+  database.close();
+  return row;
+}
+
+function editPlusMessage(messageId, senderId, newBody) {
+  const database = getDb();
+  const result = database.prepare(`
+    UPDATE plus_messages
+    SET body = ?, edited_at = datetime('now')
+    WHERE id = ? AND sender_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)
+  `).run(newBody.trim(), messageId, senderId);
+  database.close();
+  return result.changes > 0;
+}
+
+function deletePlusMessage(messageId, userId = null, isAdmin = false) {
+  const database = getDb();
+  let result;
+  if (isAdmin) {
+    result = database.prepare(`DELETE FROM plus_messages WHERE id = ?`).run(messageId);
+  } else if (userId) {
+    result = database.prepare(`DELETE FROM plus_messages WHERE id = ? AND sender_id = ?`).run(messageId, userId);
+  } else {
+    database.close();
+    return false;
+  }
+  database.close();
+  return result.changes > 0;
+}
+
+function togglePlusMessageReaction(messageId, userId, emoji) {
+  const database = getDb();
+  const cleanEmoji = (emoji || '').trim();
+  if (!cleanEmoji) {
+    database.close();
+    return { action: 'none', reactions: [] };
+  }
+
+  const existing = database.prepare(`
+    SELECT id FROM plus_message_reactions
+    WHERE message_id = ? AND user_id = ? AND emoji = ?
+  `).get(messageId, userId, cleanEmoji);
+
+  let action = '';
+  if (existing) {
+    database.prepare(`DELETE FROM plus_message_reactions WHERE id = ?`).run(existing.id);
+    action = 'removed';
+  } else {
+    try {
+      database.prepare(`
+        INSERT INTO plus_message_reactions (message_id, user_id, emoji)
+        VALUES (?, ?, ?)
+      `).run(messageId, userId, cleanEmoji);
+      action = 'added';
+    } catch (_) {
+      action = 'none';
+    }
+  }
+
+  const reactionsMap = getReactionsForMessages(database, [messageId], userId);
+  const reactions = reactionsMap[messageId] || [];
+  database.close();
+  return { action, reactions };
+}
+
+function togglePinPlusMessage(messageId, isPinned = 1) {
+  const database = getDb();
+  const val = isPinned ? 1 : 0;
+  const result = database.prepare(`
+    UPDATE plus_messages
+    SET is_pinned = ?
+    WHERE id = ? AND (is_deleted = 0 OR is_deleted IS NULL)
+  `).run(val, messageId);
+  database.close();
+  return result.changes > 0;
+}
+
+function getPinnedPlusMessages(channelId, currentUserId = null) {
+  const database = getDb();
+  const rows = database.prepare(`
+    SELECT m.*, u.username, u.display_name, u.avatar_path, u.is_staff
+    FROM plus_messages m
+    JOIN users u ON m.sender_id = u.id
+    WHERE m.channel_id = ? AND m.is_pinned = 1 AND (m.is_deleted = 0 OR m.is_deleted IS NULL)
+    ORDER BY m.id DESC
+  `).all(channelId);
+
+  const messageIds = rows.map(r => r.id);
+  const reactionsMap = getReactionsForMessages(database, messageIds, currentUserId);
+
+  const messages = rows.map(m => ({
+    ...m,
+    reactions: reactionsMap[m.id] || []
+  }));
+
+  database.close();
+  return messages;
+}
+
+function searchPlusChannelMessages(channelId, query, currentUserId = null) {
+  const database = getDb();
+  const cleanQ = (query || '').trim();
+  if (!cleanQ) {
+    database.close();
+    return [];
+  }
+  const rows = database.prepare(`
+    SELECT m.*, u.username, u.display_name, u.avatar_path, u.is_staff
+    FROM plus_messages m
+    JOIN users u ON m.sender_id = u.id
+    WHERE m.channel_id = ? AND m.body LIKE ? AND (m.is_deleted = 0 OR m.is_deleted IS NULL)
+    ORDER BY m.id DESC
+    LIMIT 30
+  `).all(channelId, `%${cleanQ}%`);
+
+  const messageIds = rows.map(r => r.id);
+  const reactionsMap = getReactionsForMessages(database, messageIds, currentUserId);
+
+  const messages = rows.map(m => ({
+    ...m,
+    reactions: reactionsMap[m.id] || []
+  }));
+
+  database.close();
+  return messages;
+}
+
+function updatePlusServer(serverId, { name, description, isDiscoverable, iconPath, bannerPath }) {
+  const database = getDb();
+  const updates = [];
+  const params = [];
+
+  if (typeof name === 'string' && name.trim()) {
+    updates.push('name = ?');
+    params.push(name.trim().slice(0, 60));
+  }
+  if (typeof description === 'string') {
+    updates.push('description = ?');
+    params.push(description.trim().slice(0, 500));
+  }
+  if (typeof isDiscoverable !== 'undefined') {
+    updates.push('is_discoverable = ?');
+    params.push(isDiscoverable ? 1 : 0);
+  }
+  if (typeof iconPath !== 'undefined') {
+    updates.push('icon_path = ?');
+    params.push(iconPath);
+  }
+  if (typeof bannerPath !== 'undefined') {
+    updates.push('banner_path = ?');
+    params.push(bannerPath);
+  }
+
+  if (updates.length > 0) {
+    params.push(serverId);
+    database.prepare(`UPDATE plus_servers SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  }
+  database.close();
+}
+
+function deletePlusServer(serverId) {
+  const database = getDb();
+  database.prepare('DELETE FROM plus_servers WHERE id = ?').run(serverId);
+  database.close();
+}
+
+function updatePlusChannel(channelId, { name, topic }) {
+  const database = getDb();
+  const updates = [];
+  const params = [];
+  if (typeof name === 'string' && name.trim()) {
+    const cleanName = name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 30);
+    updates.push('name = ?');
+    params.push(cleanName || 'channel');
+  }
+  if (typeof topic === 'string') {
+    updates.push('topic = ?');
+    params.push(topic.trim().slice(0, 255));
+  }
+  if (updates.length > 0) {
+    params.push(channelId);
+    database.prepare(`UPDATE plus_channels SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  }
+  database.close();
+}
+
+function deletePlusChannel(channelId) {
+  const database = getDb();
+  database.prepare('DELETE FROM plus_channels WHERE id = ?').run(channelId);
+  database.close();
+}
+
+function updatePlusMemberRole(serverId, userId, role) {
+  const database = getDb();
+  const validRole = role === 'admin' ? 'admin' : 'member';
+  database.prepare('UPDATE plus_server_members SET role = ? WHERE server_id = ? AND user_id = ?').run(validRole, serverId, userId);
+  database.close();
+}
+
+function kickPlusServerMember(serverId, userId) {
+  const database = getDb();
+  database.prepare('DELETE FROM plus_server_members WHERE server_id = ? AND user_id = ?').run(serverId, userId);
+  database.close();
+}
+
+function banPlusServerMember(serverId, userId, bannedBy, reason = '') {
+  const database = getDb();
+  const banTx = database.transaction(() => {
+    database.prepare('DELETE FROM plus_server_members WHERE server_id = ? AND user_id = ?').run(serverId, userId);
+    database.prepare(`
+      INSERT OR REPLACE INTO plus_server_bans (server_id, user_id, banned_by, reason)
+      VALUES (?, ?, ?, ?)
+    `).run(serverId, userId, bannedBy, (reason || '').trim().slice(0, 255));
+  });
+  banTx();
+  database.close();
+}
+
+function unbanPlusServerMember(serverId, userId) {
+  const database = getDb();
+  database.prepare('DELETE FROM plus_server_bans WHERE server_id = ? AND user_id = ?').run(serverId, userId);
+  database.close();
+}
+
+function isPlusServerBanned(serverId, userId) {
+  if (!serverId || !userId) return false;
+  const database = getDb();
+  const row = database.prepare('SELECT 1 FROM plus_server_bans WHERE server_id = ? AND user_id = ?').get(serverId, userId);
+  database.close();
+  return !!row;
+}
+
+function getPlusServerBans(serverId) {
+  const database = getDb();
+  const rows = database.prepare(`
+    SELECT b.*, u.username, u.display_name, u.avatar_path,
+      admin.username AS banned_by_username
+    FROM plus_server_bans b
+    JOIN users u ON b.user_id = u.id
+    LEFT JOIN users admin ON b.banned_by = admin.id
+    WHERE b.server_id = ?
+    ORDER BY b.banned_at DESC
+  `).all(serverId);
+  database.close();
+  return rows;
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -1919,6 +2577,8 @@ module.exports = {
   getUserSettings,
   setUserTheme,
   setEmailDigest,
+  isPlusEnabled,
+  setPlusEnabled,
   hasSeenWhatsNew,
   markSeenWhatsNew,
   createReport,
@@ -1985,4 +2645,37 @@ module.exports = {
   logModeratorAction,
   getModeratorAuditLogs,
   getModeratorAuditLogCount,
+  generateUniquePlusInviteCode,
+  createPlusServer,
+  getPlusServerById,
+  getPlusServerByInviteCode,
+  getDiscoverablePlusServers,
+  getUserPlusServers,
+  isPlusServerMember,
+  getPlusServerMember,
+  addPlusServerMember,
+  leavePlusServer,
+  getPlusServerMembers,
+  getPlusServerChannels,
+  getPlusChannelById,
+  createPlusChannel,
+  getPlusChannelMessages,
+  addPlusMessage,
+  getPlusMessageById,
+  editPlusMessage,
+  deletePlusMessage,
+  togglePlusMessageReaction,
+  togglePinPlusMessage,
+  getPinnedPlusMessages,
+  searchPlusChannelMessages,
+  updatePlusServer,
+  deletePlusServer,
+  updatePlusChannel,
+  deletePlusChannel,
+  updatePlusMemberRole,
+  kickPlusServerMember,
+  banPlusServerMember,
+  unbanPlusServerMember,
+  isPlusServerBanned,
+  getPlusServerBans,
 };

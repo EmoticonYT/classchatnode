@@ -77,6 +77,7 @@
     </form>
   </div>
 
+
   <!-- Support Tickets Section -->
   <div class="staff-section" id="support-tickets">
     <div class="support-section-header">
@@ -289,6 +290,7 @@
             <th>User</th>
             <th>Role</th>
             <th>Status</th>
+            <th>Plus</th>
             <th>Joined</th>
             <th class="cell-actions">Actions</th>
           </tr>
@@ -332,9 +334,31 @@
               <span class="status-badge-active" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">Active</span>
               <% } %>
             </td>
+            <td>
+              <% if (u.plus_enabled) { %>
+              <span style="background: linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(236, 72, 153, 0.25)); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.45); padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                ✨ Plus Active
+              </span>
+              <% } else { %>
+              <span class="muted" style="font-size: 0.78rem;">Disabled</span>
+              <% } %>
+            </td>
             <td class="muted" style="font-size: 0.8rem;"><%= u.created_at %></td>
             <td class="cell-actions">
               <a href="/staff/users/<%= u.id %>/edit" class="btn btn-ghost btn-sm">Edit</a>
+
+              <!-- Plus Toggle Action -->
+              <% if (!u.plus_enabled) { %>
+                <form action="/staff/users/<%= u.id %>/toggle-plus" method="post" style="display:inline;">
+                  <input type="hidden" name="enabled" value="1">
+                  <button type="submit" class="btn btn-ghost btn-sm" style="color: #c084fc; font-weight: 600;" title="Turn ON ClassChat Plus for @<%= u.username %>">+ Plus</button>
+                </form>
+              <% } else { %>
+                <form action="/staff/users/<%= u.id %>/toggle-plus" method="post" style="display:inline;" onsubmit="return confirm('Disable ClassChat Plus for @<%= u.username %>?');">
+                  <input type="hidden" name="enabled" value="0">
+                  <button type="submit" class="btn btn-ghost btn-sm" style="color: #94a3b8; font-size: 0.78rem;" title="Disable ClassChat Plus for @<%= u.username %>">Disable Plus</button>
+                </form>
+              <% } %>
 
               <% if (u.id !== user.id && !uIsOwner) { %>
                 <!-- Timeout / Untimeout Action -->

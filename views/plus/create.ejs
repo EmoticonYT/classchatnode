@@ -1,0 +1,103 @@
+<div class="plus-layout-wrap">
+  <!-- Left Server Rail (72px) -->
+  <nav class="plus-server-rail" aria-label="Servers">
+    <div class="plus-rail-item" title="Discover Servers">
+      <div class="plus-rail-pill"></div>
+      <a href="/plus" class="plus-rail-btn discover-btn" aria-label="Discover Communities">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+        </svg>
+      </a>
+    </div>
+
+    <div class="plus-rail-divider"></div>
+
+    <!-- Joined Servers -->
+    <% if (typeof userServers !== 'undefined' && userServers.length > 0) { %>
+      <% userServers.forEach(function(s) { %>
+        <div class="plus-rail-item" title="<%= s.name %>">
+          <div class="plus-rail-pill"></div>
+          <a href="/plus/server/<%= s.id %>" class="plus-rail-btn">
+            <% if (s.icon_path) { %>
+              <img src="<%= s.icon_path %>" alt="<%= s.name %>">
+            <% } else { %>
+              <%= s.name.split(' ').map(function(w) { return w[0]; }).join('').slice(0, 3).toUpperCase() %>
+            <% } %>
+          </a>
+        </div>
+      <% }); %>
+    <% } %>
+
+    <!-- Create Server Button Active -->
+    <div class="plus-rail-item active" title="Create a Server">
+      <div class="plus-rail-pill"></div>
+      <a href="/plus/create" class="plus-rail-btn create-btn" aria-label="Create a Server">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Create Server Main View -->
+  <main class="plus-discover-main" style="display:flex; align-items:center; justify-content:center;">
+    <div class="plus-form-container">
+      <h2 class="plus-form-title">Create Your Server</h2>
+      <p class="plus-form-subtitle">Customize your server with a name, an icon, and a banner. You can always change these later.</p>
+
+      <% if (typeof error !== 'undefined' && error) { %>
+        <div style="background:rgba(239, 68, 68, 0.15); border:1px solid #ef4444; border-radius:8px; padding:10px 14px; margin-bottom:18px; color:#fca5a5; font-size:0.88rem;">
+          <%= error %>
+        </div>
+      <% } %>
+
+      <form action="/plus/create" method="POST" enctype="multipart/form-data">
+        <div class="plus-form-group">
+          <label class="plus-form-label">Server Name *</label>
+          <input type="text" name="name" class="plus-form-input" placeholder="e.g. Science Olympiad 2026" maxlength="50" required autofocus>
+        </div>
+
+        <div class="plus-form-group">
+          <label class="plus-form-label">Description (Optional)</label>
+          <textarea name="description" class="plus-form-textarea" rows="2" placeholder="Tell members what this server is about..." maxlength="300"></textarea>
+        </div>
+
+        <div class="plus-form-group">
+          <label class="plus-form-label">Server Icon &amp; Banner (Combined max 5MB)</label>
+          <div class="plus-upload-grid">
+            <label class="plus-upload-box">
+              <input type="file" name="icon" accept="image/*" style="display:none;" onchange="this.nextElementSibling.textContent = this.files[0] ? this.files[0].name : 'Choose Icon';">
+              <span style="font-weight:600; color:#f2f3f5; font-size:0.85rem;">Choose Icon</span>
+              <div class="plus-upload-hint">Square profile icon</div>
+            </label>
+            <label class="plus-upload-box">
+              <input type="file" name="banner" accept="image/*" style="display:none;" onchange="this.nextElementSibling.textContent = this.files[0] ? this.files[0].name : 'Choose Banner';">
+              <span style="font-weight:600; color:#f2f3f5; font-size:0.85rem;">Choose Banner</span>
+              <div class="plus-upload-hint">Header background banner</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="plus-form-group">
+          <div class="plus-privacy-card">
+            <div class="plus-privacy-info">
+              <h4>Make Server Discoverable</h4>
+              <p>If checked, anyone can find and join this server from the Discover page. If unchecked, it will be private and only joinable via invite code.</p>
+            </div>
+            <label class="plus-switch">
+              <input type="checkbox" name="is_discoverable" value="1" checked>
+              <span class="plus-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:28px;">
+          <a href="/plus" class="btn btn-ghost">Cancel</a>
+          <button type="submit" class="btn btn-primary btn-plus-glow">Create Server</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
